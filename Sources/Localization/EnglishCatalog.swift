@@ -2,6 +2,7 @@ import Foundation
 
 enum EnglishCatalog {
     static let strings: [String: String] = [
+    "スペクトラムの表示値（Slope補正後）。EQゲインとは別の軸です。": "Spectrum level after display slope compensation; separate from EQ gain.",
     "EQ直後 • L/Rパワー平均 • 表示傾斜のみ（音声は変化しません） • 20 fps": "Post-EQ • L/R power average • Display slope only (audio unchanged) • 20 fps",
     "右クリックでPAD切替、ダブルクリックで中央。FORMANTは共鳴帯域を動かす試験用音色処理です。": "Right-click to cycle PADs; double-click to center. FORMANT is experimental resonance coloration.",
     "INSERTの後とLIMITの前は同じ位置です。EQはINSERT群の途中には入りません。変更時は音声が一時停止します。": "After INSERT and before LIMIT are the same position. EQ stays outside the INSERT group. Audio briefly stops when changing the order.",

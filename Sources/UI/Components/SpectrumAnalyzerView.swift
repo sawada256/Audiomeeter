@@ -8,7 +8,7 @@ import SwiftUI
     func stop(_ capture: SpectrumCapture) {
         capture.select(nil); timer?.cancel(); timer = nil; generation += 1
     }
-    func start(capture: SpectrumCapture, bus: BusID, size: Int, window: SpectrumWindow, average: Float, slope: Float, smoothing: Float) {
+    func start(capture: SpectrumCapture, bus: BusID, size: Int, window: SpectrumWindow, average: Float, slope: Float, smoothing: Float, fps: Int) {
         stop(capture)
         let token = generation
         let timer = DispatchSource.makeTimerSource(queue:queue)
@@ -34,13 +34,13 @@ import SwiftUI
             let rate = capture.sampleRate
             guard rate > 0 else { return }
             // Bound work: at most four FFT windows per UI tick. Drop visual history when behind.
-            let hop = size/4
+            let hop = min(size, max(size/4, Int(rate / Float(fps) / 4)))
             if pending.count > (size+4*hop)*2 { pending.removeFirst(pending.count-(size+4*hop)*2) }
             var processed = false
             var steps = 0
             while pending.count >= size*2 && steps < 4 {
                 let power = fft.powers(pending)
-                let alpha = expf(-Float(hop)/rate/max(0.01,average))
+                let alpha: Float = average > 0 ? expf(-Float(hop)/rate/average) : 0
                 for i in averaged.indices { averaged[i] = started ? alpha*averaged[i]+(1-alpha)*power[i] : power[i] }
                 started = true; processed = true; steps += 1
                 pending.removeFirst(hop*2)
@@ -52,33 +52,41 @@ import SwiftUI
                 self.bins = bins
             }
         }
-        timer.schedule(deadline:.now(),repeating:1.0/20,leeway:.milliseconds(8))
+        timer.schedule(deadline:.now(),repeating:1.0/Double(fps),leeway:.milliseconds(fps >= 60 ? 2 : 8))
         timer.resume()
     }
 }
 
-struct SpectrumAnalyzerView: View {
+struct SpectrumAnalyzerView<Content: View>: View {
+    let content: (SpectrumModel, Bool) -> Content
     let capture: SpectrumCapture
     let bus: BusID
     // The control panel must not subscribe to FFT frames; only SpectrumPlot observes them.
     @State private var model = SpectrumModel()
     @AppStorage("spectrumEnabled") private var enabled = false
+    @AppStorage("spectrumFPS") private var fps = 20
     @AppStorage("spectrumSize") private var size = 8192
     @AppStorage("spectrumWindow") private var window = "Hann"
     @AppStorage("spectrumAverage") private var average = 0.3
     @AppStorage("spectrumSlope") private var slope = 3.0103
     @AppStorage("spectrumSmoothing") private var smoothing = 1.0/6
-    private var signature: String { "\(enabled)-\(size)-\(window)-\(average)-\(slope)-\(smoothing)" }
+    private var signature: String { "\(fps)-\(enabled)-\(size)-\(window)-\(average)-\(slope)-\(smoothing)" }
     private func refresh() {
         guard enabled else { model.stop(capture); return }
         model.start(capture:capture,bus:bus,size:size,window:SpectrumWindow(rawValue:window) ?? .hann,
-                    average:Float(average),slope:Float(slope),smoothing:Float(smoothing))
+                    average:Float(average),slope:Float(slope),smoothing:Float(smoothing), fps:[20,30,60].contains(fps) ? fps : 20)
     }
     var body: some View {
         VStack(spacing:4) {
             HStack {
                 Toggle("SPECTRUM",isOn:$enabled).toggleStyle(.switch)
                 if enabled {
+                    Menu("Response") {
+                        Button("Fast • 2048 / 30 ms / 60 fps") { size = 2048; average = 0.03; fps = 60 }
+                        Button("Balanced • 8192 / 300 ms / 20 fps") { size = 8192; average = 0.3; fps = 20 }
+                        Button("Detailed • 16384 / 600 ms / 20 fps") { size = 16384; average = 0.6; fps = 20 }
+                    }.frame(width:100)
+                    Picker("FPS",selection:$fps) { ForEach([20,30,60],id:\.self) { Text("\($0)").tag($0) } }.frame(width:90)
                     Picker("FFT",selection:$size) { ForEach([2048,4096,8192,16384],id:\.self) { Text("\($0)").tag($0) } }.frame(width:120)
                     Picker("Window",selection:$window) { ForEach(SpectrumWindow.allCases,id:\.rawValue) { Text($0.rawValue).tag($0.rawValue) } }.frame(width:155)
                 }
@@ -86,37 +94,38 @@ struct SpectrumAnalyzerView: View {
             }.font(.caption).controlSize(.mini)
             if enabled {
                 HStack {
-                    Picker("Avg",selection:$average) { ForEach([0.1,0.3,0.6,1.0],id:\.self) { Text("\(Int($0*1000)) ms").tag($0) } }.frame(width:120)
+                    Picker("Avg",selection:$average) { ForEach([0.0,0.03,0.05,0.1,0.3,0.6,1.0],id:\.self) { Text("\(Int($0*1000)) ms").tag($0) } }.frame(width:120)
                     Picker("Slope",selection:$slope) { ForEach([0.0,3.0103,4.5,6.0],id:\.self) { Text(String(format:"%.2f dB/oct",$0)).tag($0) } }.frame(width:155)
                     Picker("Smooth",selection:$smoothing) { Text("1/12 oct").tag(1.0/12);Text("1/6 oct").tag(1.0/6);Text("1/3 oct").tag(1.0/3) }.frame(width:135)
                 Spacer(minLength:0)
                 }.font(.caption).controlSize(.mini)
             }
-            if enabled {
-                SpectrumPlot(model:model).frame(height:90)
-                Text(L10n.text("EQ直後 • L/Rパワー平均 • 表示傾斜のみ（音声は変化しません） • 20 fps"))
-                    .font(.system(size:9)).foregroundStyle(.secondary)
-            }
         }.padding(.horizontal,12).padding(.vertical,4)
             .onAppear(perform:refresh).onChange(of:signature) { _, _ in refresh() }.onDisappear { model.stop(capture) }
+        content(model, enabled)
     }
 }
-private struct SpectrumPlot: View {
+struct SpectrumPlot: View {
     @ObservedObject var model: SpectrumModel
     var body: some View {
         Canvas(rendersAsynchronously: true) { context,size in
-            for db in [-90,-60,-30,0] {
-                let y = size.height * CGFloat(-db)/100
-                var grid = Path();grid.move(to:CGPoint(x:0,y:y));grid.addLine(to:CGPoint(x:size.width,y:y))
-                context.stroke(grid,with:.color(.gray.opacity(0.25)),lineWidth:0.5)
-                context.draw(Text("\(db)").font(.system(size:8)).foregroundColor(.gray),at:CGPoint(x:14,y:min(size.height-5,y+5)))
-            }
             var curve = Path()
             for i in model.bins.indices {
                 let p = CGPoint(x:size.width*CGFloat(i)/255,y:size.height*CGFloat(min(100,max(0,-model.bins[i])))/100)
                 if i == 0 { curve.move(to:p) } else { curve.addLine(to:p) }
             }
-            context.stroke(curve,with:.color(.green.opacity(0.85)),lineWidth:1)
-        }.background(VMTheme.grooveDark)
+            context.stroke(curve,with:.color(.green.opacity(0.75)),lineWidth:1)
+        }
+    }
+}
+struct SpectrumAxis: View {
+    var body: some View {
+        GeometryReader { geo in
+            ForEach([-90,-60,-30,0],id:\.self) { db in
+                Text("\(db)").font(.system(size:9,design:.monospaced)).foregroundStyle(.green.opacity(0.8))
+                    .position(x:22,y:max(10,geo.size.height*CGFloat(-db)/100))
+            }
+            Text("dB*").font(.system(size:8)).foregroundStyle(.green.opacity(0.8)).position(x:22,y:geo.size.height-8)
+        }.frame(width:44).help(L10n.text("スペクトラムの表示値（Slope補正後）。EQゲインとは別の軸です。"))
     }
 }

@@ -63,7 +63,7 @@ final class SpectrumFFT {
     static func display(_ powers: [Float], rate: Float, size: Int, slope: Float, smoothing: Float = 1.0/6) -> [Float] {
         guard rate > 0 else { return [Float](repeating:-120,count:256) }
         return (0..<256).map { i in
-            let frequency = 20 * powf(min(20000,rate*0.49)/20,Float(i)/255)
+            let frequency = 20 * powf(20000.0/20,Float(i)/255)
             let halfWidth = max(1.0/48,smoothing)/2
             let low = max(1,Int(frequency*powf(2,-halfWidth)*Float(size)/rate))
             let high = min(powers.count-1,max(low,Int(frequency*powf(2,halfWidth)*Float(size)/rate)))

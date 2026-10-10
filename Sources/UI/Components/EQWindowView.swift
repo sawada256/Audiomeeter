@@ -106,7 +106,7 @@ public struct EQWindowView: View {
             }
             .controlSize(.small).padding(.horizontal, 16).padding(.vertical, 8)
 
-            SpectrumAnalyzerView(capture: appState.spectrumCapture, bus: bus)
+            SpectrumAnalyzerView(content: { spectrumModel, spectrumEnabled in
 
             // Frequency Response Graph (Logarithmic 20Hz - 20kHz, -18dB - +18dB)
             GeometryReader { geo in
@@ -114,6 +114,8 @@ public struct EQWindowView: View {
                     // Background & Grid
                     Rectangle()
                         .fill(Color(red: 0.07, green: 0.08, blue: 0.11))
+
+                    if spectrumEnabled { SpectrumPlot(model: spectrumModel).allowsHitTesting(false) }
 
                     // Grid Lines (dB)
                     ForEach([-12, -6, 0, 6, 12], id: \.self) { db in
@@ -142,7 +144,7 @@ public struct EQWindowView: View {
                         Text(freq >= 1000 ? "\(freq / 1000)k" : "\(freq)")
                             .font(.system(size: 9, design: .monospaced))
                             .foregroundColor(Color.gray.opacity(0.8))
-                            .position(x: x + 12, y: geo.size.height - 10)
+                            .position(x: min(geo.size.width-15,max(15,x)), y: geo.size.height - 10)
                     }
 
                     // Fill under curve
@@ -227,7 +229,10 @@ public struct EQWindowView: View {
                     }
                 }
             }
-            .frame(height: 150)
+            .padding(.trailing,44)
+            .overlay(alignment:.trailing) { if spectrumEnabled { SpectrumAxis().allowsHitTesting(false) } }
+            .frame(height: 200)
+            }, capture: appState.spectrumCapture, bus: bus)
 
             Divider().background(VMTheme.panelBorder)
 

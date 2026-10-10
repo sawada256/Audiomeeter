@@ -15,3 +15,5 @@ Choose PAN, INTELLIPAN, MODULATION, PITCH or FORMANT (EXP) from a hardware input
 SPECTRUM in the EQ editor toggles analysis. Defaults: OFF, 8192-point Hann FFT, 300 ms averaging, 1/6-octave smoothing, +3.01 dB/oct display slope for flat pink-noise power. Analysis stops when disabled or the editor closes. FFT runs on a utility queue; only the spectrum plot observes its 20 fps frames. Recorder reels update only while active, at 15 fps.
 
 EQ placement is before the INSERT group, after it / before LIMIT, or after LIMIT. After INSERT and before LIMIT are equivalent in the fixed PRE → FADER → POST → LIMIT chain.
+
+Build 6 overlays the spectrum on the restored 200 pt EQ plot, sharing its 20 Hz–20 kHz frequency axis. EQ gain is on the left; slope-adjusted spectrum levels are on the right. Response → Fast selects 2048-point FFT, 30 ms averaging and up to 60 fps. FFT, Avg and FPS remain individually adjustable; Avg 0 ms disables averaging. Shorter windows respond faster but reduce frequency resolution, especially in the bass.
