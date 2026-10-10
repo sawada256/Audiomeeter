@@ -1,0 +1,574 @@
+import Foundation
+import Accelerate
+
+/// Biquad Filter Coefficients and State for 3-band EQ
+public struct BiquadFilter {
+    private var b0: Float = 1.0, b1: Float = 0.0, b2: Float = 0.0
+    private var a1: Float = 0.0, a2: Float = 0.0
+    private var x1_L: Float = 0.0, x2_L: Float = 0.0, y1_L: Float = 0.0, y2_L: Float = 0.0
+    private var x1_R: Float = 0.0, x2_R: Float = 0.0, y1_R: Float = 0.0, y2_R: Float = 0.0
+
+    public init() {}
+
+    public mutating func reset() {
+        x1_L = 0; x2_L = 0; y1_L = 0; y2_L = 0
+        x1_R = 0; x2_R = 0; y1_R = 0; y2_R = 0
+    }
+
+    public mutating func setLowShelf(sampleRate: Float, cutoffHz: Float = 100.0, gainDB: Float) {
+        if abs(gainDB) < 0.05 {
+            b0 = 1.0; b1 = 0.0; b2 = 0.0; a1 = 0.0; a2 = 0.0
+            return
+        }
+        let A = powf(10.0, gainDB / 40.0)
+        let w0 = 2.0 * Float.pi * cutoffHz / sampleRate
+        let cosw0 = cosf(w0)
+        let sinw0 = sinf(w0)
+        let alpha = sinw0 / 2.0 * sqrtf((A + 1.0 / A) * (1.0 / 0.707 - 1.0) + 2.0)
+
+        let a0 = (A + 1.0) + (A - 1.0) * cosw0 + 2.0 * sqrtf(A) * alpha
+        b0 = (A * ((A + 1.0) - (A - 1.0) * cosw0 + 2.0 * sqrtf(A) * alpha)) / a0
+        b1 = (2.0 * A * ((A - 1.0) - (A + 1.0) * cosw0)) / a0
+        b2 = (A * ((A + 1.0) - (A - 1.0) * cosw0 - 2.0 * sqrtf(A) * alpha)) / a0
+        a1 = (-2.0 * ((A - 1.0) + (A + 1.0) * cosw0)) / a0
+        a2 = ((A + 1.0) + (A - 1.0) * cosw0 - 2.0 * sqrtf(A) * alpha) / a0
+    }
+
+    public mutating func setPeaking(sampleRate: Float, freqHz: Float = 1000.0, Q: Float = 1.0, gainDB: Float) {
+        if abs(gainDB) < 0.05 {
+            b0 = 1.0; b1 = 0.0; b2 = 0.0; a1 = 0.0; a2 = 0.0
+            return
+        }
+        let A = powf(10.0, gainDB / 40.0)
+        let w0 = 2.0 * Float.pi * freqHz / sampleRate
+        let cosw0 = cosf(w0)
+        let sinw0 = sinf(w0)
+        let alpha = sinw0 / (2.0 * Q)
+
+        let a0 = 1.0 + alpha / A
+        b0 = (1.0 + alpha * A) / a0
+        b1 = (-2.0 * cosw0) / a0
+        b2 = (1.0 - alpha * A) / a0
+        a1 = (-2.0 * cosw0) / a0
+        a2 = (1.0 - alpha / A) / a0
+    }
+
+    public mutating func setHighShelf(sampleRate: Float, cutoffHz: Float = 8000.0, gainDB: Float) {
+        if abs(gainDB) < 0.05 {
+            b0 = 1.0; b1 = 0.0; b2 = 0.0; a1 = 0.0; a2 = 0.0
+            return
+        }
+        let A = powf(10.0, gainDB / 40.0)
+        let w0 = 2.0 * Float.pi * cutoffHz / sampleRate
+        let cosw0 = cosf(w0)
+        let sinw0 = sinf(w0)
+        let alpha = sinw0 / 2.0 * sqrtf((A + 1.0 / A) * (1.0 / 0.707 - 1.0) + 2.0)
+
+        let a0 = (A + 1.0) - (A - 1.0) * cosw0 + 2.0 * sqrtf(A) * alpha
+        b0 = (A * ((A + 1.0) + (A - 1.0) * cosw0 + 2.0 * sqrtf(A) * alpha)) / a0
+        b1 = (-2.0 * A * ((A - 1.0) + (A + 1.0) * cosw0)) / a0
+        b2 = (A * ((A + 1.0) + (A - 1.0) * cosw0 - 2.0 * sqrtf(A) * alpha)) / a0
+        a1 = (2.0 * ((A - 1.0) - (A + 1.0) * cosw0)) / a0
+        a2 = ((A + 1.0) - (A - 1.0) * cosw0 - 2.0 * sqrtf(A) * alpha) / a0
+    }
+
+    public mutating func setHighPass(sampleRate: Float, freqHz: Float = 80.0, Q: Float = 0.707) {
+        let w0 = 2.0 * Float.pi * max(20.0, min(freqHz, sampleRate * 0.49)) / sampleRate
+        let cosw0 = cosf(w0)
+        let alpha = sinf(w0) / (2.0 * max(0.1, Q))
+
+        let a0 = 1.0 + alpha
+        b0 = ((1.0 + cosw0) / 2.0) / a0
+        b1 = (-(1.0 + cosw0)) / a0
+        b2 = ((1.0 + cosw0) / 2.0) / a0
+        a1 = (-2.0 * cosw0) / a0
+        a2 = (1.0 - alpha) / a0
+    }
+
+    public mutating func setLowPass(sampleRate: Float, freqHz: Float = 12000.0, Q: Float = 0.707) {
+        let w0 = 2.0 * Float.pi * max(20.0, min(freqHz, sampleRate * 0.49)) / sampleRate
+        let cosw0 = cosf(w0)
+        let alpha = sinf(w0) / (2.0 * max(0.1, Q))
+
+        let a0 = 1.0 + alpha
+        b0 = ((1.0 - cosw0) / 2.0) / a0
+        b1 = (1.0 - cosw0) / a0
+        b2 = ((1.0 - cosw0) / 2.0) / a0
+        a1 = (-2.0 * cosw0) / a0
+        a2 = (1.0 - alpha) / a0
+    }
+
+    public mutating func setNotch(sampleRate: Float, freqHz: Float = 1000.0, Q: Float = 2.0) {
+        let w0 = 2.0 * Float.pi * max(20.0, min(freqHz, sampleRate * 0.49)) / sampleRate
+        let cosw0 = cosf(w0)
+        let alpha = sinf(w0) / (2.0 * max(0.1, Q))
+
+        let a0 = 1.0 + alpha
+        b0 = 1.0 / a0
+        b1 = (-2.0 * cosw0) / a0
+        b2 = 1.0 / a0
+        a1 = (-2.0 * cosw0) / a0
+        a2 = (1.0 - alpha) / a0
+    }
+
+    public mutating func configure(type: FilterType, sampleRate: Float, freqHz: Float, gainDB: Float, q: Float) {
+        switch type {
+        case .peaking:
+            setPeaking(sampleRate: sampleRate, freqHz: freqHz, Q: q, gainDB: gainDB)
+        case .lowShelf:
+            setLowShelf(sampleRate: sampleRate, cutoffHz: freqHz, gainDB: gainDB)
+        case .highShelf:
+            setHighShelf(sampleRate: sampleRate, cutoffHz: freqHz, gainDB: gainDB)
+        case .highPass:
+            setHighPass(sampleRate: sampleRate, freqHz: freqHz, Q: q)
+        case .lowPass:
+            setLowPass(sampleRate: sampleRate, freqHz: freqHz, Q: q)
+        case .notch:
+            setNotch(sampleRate: sampleRate, freqHz: freqHz, Q: q)
+        }
+    }
+
+    /// Calculate frequency response in dB at specified frequency for UI drawing
+    public func frequencyResponseDB(freq: Float, sampleRate: Float) -> Float {
+        let w = 2.0 * Float.pi * freq / sampleRate
+        let cosw = cosf(w)
+        let sinw = sinf(w)
+        let cos2w = cosf(2.0 * w)
+        let sin2w = sinf(2.0 * w)
+
+        let numReal = b0 + b1 * cosw + b2 * cos2w
+        let numImag = -(b1 * sinw + b2 * sin2w)
+
+        let denReal = 1.0 + a1 * cosw + a2 * cos2w
+        let denImag = -(a1 * sinw + a2 * sin2w)
+
+        let numMagSq = numReal * numReal + numImag * numImag
+        let denMagSq = denReal * denReal + denImag * denImag
+
+        if denMagSq < 1e-12 { return 0.0 }
+        let magSq = numMagSq / denMagSq
+        let magDB = 10.0 * log10f(max(magSq, 1e-6))
+        return max(-36.0, min(36.0, magDB))
+    }
+
+    @inline(__always)
+    public mutating func process(left: Float, right: Float) -> (Float, Float) {
+        let out_L = b0 * left + b1 * x1_L + b2 * x2_L - a1 * y1_L - a2 * y2_L
+        x2_L = x1_L; x1_L = left; y2_L = y1_L; y1_L = out_L
+
+        let out_R = b0 * right + b1 * x1_R + b2 * x2_R - a1 * y1_R - a2 * y2_R
+        x2_R = x1_R; x1_R = right; y2_R = y1_R; y1_R = out_R
+
+        return (out_L, out_R)
+    }
+}
+
+/// 6-Band Parametric Master Bus EQ
+public final class ParametricEQ6Band {
+    private var filters: [BiquadFilter] = Array(repeating: BiquadFilter(), count: 6)
+    private var lastConfig: MasterEQConfig?
+    private var lastSampleRate: Float = 0.0
+
+    public init() {}
+
+    public func reset() {
+        for i in 0..<filters.count {
+            filters[i].reset()
+        }
+    }
+
+    public func update(config: MasterEQConfig, sampleRate: Float) {
+        if lastConfig == config && lastSampleRate == sampleRate { return }
+        lastConfig = config
+        lastSampleRate = sampleRate
+
+        for i in 0..<min(6, config.bands.count) {
+            let band = config.bands[i]
+            if band.isEnabled {
+                filters[i].configure(type: band.type, sampleRate: sampleRate, freqHz: band.freqHz, gainDB: band.gainDB, q: band.q)
+            } else {
+                filters[i].configure(type: .peaking, sampleRate: sampleRate, freqHz: 1000.0, gainDB: 0.0, q: 1.0)
+            }
+        }
+    }
+
+    public func process(buffer: UnsafeMutablePointer<Float>, frames: Int) {
+        guard let config = lastConfig, config.isEnabled else { return }
+
+        for frame in 0..<frames {
+            var l = buffer[frame * 2]
+            var r = buffer[frame * 2 + 1]
+
+            for i in 0..<min(6, config.bands.count) {
+                if config.bands[i].isEnabled {
+                    let (nl, nr) = filters[i].process(left: l, right: r)
+                    l = nl
+                    r = nr
+                }
+            }
+
+            buffer[frame * 2] = l
+            buffer[frame * 2 + 1] = r
+        }
+    }
+
+    /// Calculate combined frequency response in dB across all 6 bands
+    public static func combinedResponseDB(config: MasterEQConfig, freq: Float, sampleRate: Float = 48000.0) -> Float {
+        var totalDB: Float = 0.0
+        var tempFilter = BiquadFilter()
+
+        for band in config.bands {
+            if band.isEnabled {
+                tempFilter.configure(type: band.type, sampleRate: sampleRate, freqHz: band.freqHz, gainDB: band.gainDB, q: band.q)
+                totalDB += tempFilter.frequencyResponseDB(freq: freq, sampleRate: sampleRate)
+            }
+        }
+        return max(-30.0, min(30.0, totalDB))
+    }
+}
+
+/// Karaoke Center Cancel (Vocal Remover) with Bass Preservation
+public final class KaraokeProcessor {
+    private var bassLP_L = BiquadFilter()
+    private var bassHP_L = BiquadFilter()
+    private var isConfigured = false
+
+    public init() {}
+
+    public func reset() {
+        bassLP_L.reset()
+        bassHP_L.reset()
+        isConfigured = false
+    }
+
+    private func configure(sampleRate: Float) {
+        // Crossover at 150 Hz to preserve bass and kick drum
+        bassLP_L.setLowPass(sampleRate: sampleRate, freqHz: 150.0, Q: 0.707)
+        bassHP_L.setHighPass(sampleRate: sampleRate, freqHz: 150.0, Q: 0.707)
+        isConfigured = true
+    }
+
+    public func process(buffer: UnsafeMutablePointer<Float>, frames: Int, sampleRate: Float, isEnabled: Bool) {
+        if !isEnabled { return }
+        if !isConfigured { configure(sampleRate: sampleRate) }
+
+        for i in 0..<frames {
+            let l = buffer[i * 2]
+            let r = buffer[i * 2 + 1]
+
+            // 1. Separate bass (< 150 Hz) and mid/highs (> 150 Hz)
+            let (lBass, rBass) = bassLP_L.process(left: l, right: r)
+            let (lHigh, rHigh) = bassHP_L.process(left: l, right: r)
+
+            // 2. Compute mid (vocal center) component on mid/highs
+            let midHigh = (lHigh + rHigh) * 0.5
+
+            // 3. Subtract center vocal component while preserving stereo side ambience
+            let lHighCancel = lHigh - midHigh
+            let rHighCancel = rHigh - midHigh
+
+            // 4. Recombine with intact mono bass
+            let monoBass = (lBass + rBass) * 0.5
+            buffer[i * 2] = monoBass + lHighCancel * 1.2
+            buffer[i * 2 + 1] = monoBass + rHighCancel * 1.2
+        }
+    }
+}
+
+/// Dynamics Processor (Noise Gate & Compressor)
+public final class DynamicsProcessor {
+    private var envelope: Float = 0.0
+    private var gateGain: Float = 1.0
+
+    public init() {}
+
+    public func reset() {
+        envelope = 0.0
+        gateGain = 1.0
+    }
+
+    /// Process interleaved stereo audio in-place
+    public func process(
+        buffer: UnsafeMutablePointer<Float>,
+        frames: Int,
+        sampleRate: Float,
+        compKnob: Float, // 0.0 ... 10.0
+        gateKnob: Float  // 0.0 ... 10.0
+    ) {
+        let hasComp = compKnob > 0.05
+        let hasGate = gateKnob > 0.05
+        if !hasComp && !hasGate { return }
+
+        // Compressor parameters based on knob 0-10
+        let compThresholdDB = -10.0 - (compKnob * 2.5) // -10dB to -35dB
+        let compRatio = 1.0 + (compKnob * 0.5)         // 1:1 to 6:1
+        let makeupGainLinear = powf(10.0, (compKnob * 0.8) / 20.0)
+
+        // Noise gate parameters based on knob 0-10
+        let gateThresholdDB = -60.0 + (gateKnob * 3.0) // -60dB to -30dB
+        let gateThresholdLinear = powf(10.0, gateThresholdDB / 20.0)
+
+        let attackCoeff = expf(-1.0 / (0.010 * sampleRate))  // 10ms attack
+        let releaseCoeff = expf(-1.0 / (0.150 * sampleRate)) // 150ms release
+        let gateAttackCoeff = expf(-1.0 / (0.002 * sampleRate)) // 2ms gate attack
+        let gateReleaseCoeff = expf(-1.0 / (0.080 * sampleRate)) // 80ms gate release
+
+        for i in 0..<frames {
+            let left = buffer[i * 2]
+            let right = buffer[i * 2 + 1]
+            let peak = max(abs(left), abs(right))
+
+            // Envelope follower
+            if peak > envelope {
+                envelope = attackCoeff * envelope + (1.0 - attackCoeff) * peak
+            } else {
+                envelope = releaseCoeff * envelope + (1.0 - releaseCoeff) * peak
+            }
+
+            // Noise Gate calculation
+            if hasGate {
+                let targetGateGain: Float = envelope < gateThresholdLinear ? 0.0 : 1.0
+                if targetGateGain > gateGain {
+                    gateGain = gateAttackCoeff * gateGain + (1.0 - gateAttackCoeff) * targetGateGain
+                } else {
+                    gateGain = gateReleaseCoeff * gateGain + (1.0 - gateReleaseCoeff) * targetGateGain
+                }
+            }
+
+            // Compressor calculation
+            var compGain: Float = 1.0
+            if hasComp && envelope > 1e-5 {
+                let envDB = 20.0 * log10f(envelope)
+                if envDB > compThresholdDB {
+                    let overDB = envDB - compThresholdDB
+                    let gainReductionDB = overDB * (1.0 - 1.0 / compRatio)
+                    compGain = powf(10.0, -gainReductionDB / 20.0)
+                }
+            }
+
+            let totalGain = gateGain * compGain * (hasComp ? makeupGainLinear : 1.0)
+            buffer[i * 2] = left * totalGain
+            buffer[i * 2 + 1] = right * totalGain
+        }
+    }
+}
+
+/// Strip DSP (Fader, EQ, Intellipan, Dynamics, Karaoke)
+public final class StripDSP {
+    private var currentGainLinear: Float = 1.0
+    private var targetGainLinear: Float = 1.0
+    private var lowFilter = BiquadFilter()
+    private var midFilter = BiquadFilter()
+    private var highFilter = BiquadFilter()
+    private var dynamics = DynamicsProcessor()
+    private var karaoke = KaraokeProcessor()
+    private var lastEQ: EQ3Band?
+    private var lastEQRate: Float = 0
+
+    public init() {}
+
+    public func reset() {
+        lowFilter.reset()
+        midFilter.reset()
+        highFilter.reset()
+        dynamics.reset()
+        karaoke.reset()
+    }
+
+    /// Process input strip audio in-place
+    public func process(
+        buffer: UnsafeMutablePointer<Float>,
+        frames: Int,
+        sampleRate: Float,
+        gainDB: Float,
+        isMuted: Bool,
+        dynamicsConfig: DynamicsConfig,
+        intellipan: IntellipanState,
+        eq: EQ3Band,
+        isVirtual: Bool,
+        isKaraoke: Bool = false
+    ) {
+        if isMuted || gainDB <= -59.5 {
+            targetGainLinear = 0.0
+        } else {
+            targetGainLinear = powf(10.0, gainDB / 20.0)
+        }
+
+        // Apply Dynamics (Comp & Gate for hardware strips)
+        if !isVirtual {
+            dynamics.process(
+                buffer: buffer,
+                frames: frames,
+                sampleRate: sampleRate,
+                compKnob: dynamicsConfig.compKnob,
+                gateKnob: dynamicsConfig.gateKnob
+            )
+        }
+
+        // Apply Karaoke / Center Cancel (for virtual strips)
+        if isVirtual && isKaraoke {
+            karaoke.process(buffer: buffer, frames: frames, sampleRate: sampleRate, isEnabled: isKaraoke)
+        }
+
+        // Apply 3-Band EQ (Virtual strips or hardware)
+        if isVirtual {
+            if lastEQ != eq || lastEQRate != sampleRate {
+            lastEQ = eq
+            lastEQRate = sampleRate
+            lowFilter.setLowShelf(sampleRate: sampleRate, cutoffHz: 100.0, gainDB: eq.lowGainDB)
+            midFilter.setPeaking(sampleRate: sampleRate, freqHz: 1000.0, Q: 1.0, gainDB: eq.midGainDB)
+            highFilter.setHighShelf(sampleRate: sampleRate, cutoffHz: 8000.0, gainDB: eq.highGainDB)
+
+            }
+            for i in 0..<frames {
+                let l = buffer[i * 2]
+                let r = buffer[i * 2 + 1]
+                let (l1, r1) = lowFilter.process(left: l, right: r)
+                let (l2, r2) = midFilter.process(left: l1, right: r1)
+                let (l3, r3) = highFilter.process(left: l2, right: r2)
+                buffer[i * 2] = l3
+                buffer[i * 2 + 1] = r3
+            }
+        }
+
+        // Intellipan (Voice Color / Pan)
+        let pan = max(-1.0, min(1.0, intellipan.x))
+        let panL = cosf(max(0, pan) * Float.pi / 2.0)
+        let panR = cosf(max(0, -pan) * Float.pi / 2.0)
+
+        // Gain smoothing (ramping over frame buffer to avoid clicks)
+        let gainStep = (targetGainLinear - currentGainLinear) / Float(max(frames, 1))
+
+        for i in 0..<frames {
+            currentGainLinear += gainStep
+            let l = buffer[i * 2] * currentGainLinear * panL
+            let r = buffer[i * 2 + 1] * currentGainLinear * panR
+            buffer[i * 2] = l
+            buffer[i * 2 + 1] = r
+        }
+        currentGainLinear = targetGainLinear
+    }
+}
+
+/// Master Bus DSP (Gain, Bus Mode, 6-band Parametric EQ, Limiter)
+public final class BusDSP {
+    private var currentGainLinear: Float = 1.0
+    private var targetGainLinear: Float = 1.0
+    private var eq = ParametricEQ6Band()
+
+    public init() {}
+
+    public func reset() {
+        eq.reset()
+    }
+
+    public func process(
+        buffer: UnsafeMutablePointer<Float>,
+        frames: Int,
+        sampleRate: Float,
+        gainDB: Float,
+        isMuted: Bool,
+        mode: BusMode,
+        isEQEnabled: Bool = false,
+        eqConfig: MasterEQConfig = MasterEQConfig(),
+        limiterEnabled: Bool = true
+    ) {
+        // Apply 6-Band Parametric EQ
+        if isEQEnabled {
+            eq.update(config: eqConfig, sampleRate: sampleRate)
+            eq.process(buffer: buffer, frames: frames)
+        }
+
+        if isMuted || gainDB <= -59.5 {
+            targetGainLinear = 0.0
+        } else {
+            targetGainLinear = powf(10.0, gainDB / 20.0)
+        }
+
+        let gainStep = (targetGainLinear - currentGainLinear) / Float(max(frames, 1))
+
+        for i in 0..<frames {
+            currentGainLinear += gainStep
+            var l = buffer[i * 2] * currentGainLinear
+            var r = buffer[i * 2 + 1] * currentGainLinear
+
+            // Bus Mode processing
+            switch mode {
+            case .normal:
+                break
+            case .mixdown:
+                let mono = (l + r) * 0.7071
+                l = mono
+                r = mono
+            case .mono:
+                let mono = (l + r) * 0.5
+                l = mono
+                r = mono
+            }
+
+            // Soft-knee Limiter to prevent harsh digital clipping
+            if limiterEnabled {
+                let threshold: Float = 0.9
+                if abs(l) > threshold { l = copysignf(threshold + 0.1 * tanhf((abs(l) - threshold) / 0.1), l) }
+                if abs(r) > threshold { r = copysignf(threshold + 0.1 * tanhf((abs(r) - threshold) / 0.1), r) }
+            }
+            if !l.isFinite { l = 0 }
+            if !r.isFinite { r = 0 }
+
+            buffer[i * 2] = l
+            buffer[i * 2 + 1] = r
+        }
+        currentGainLinear = targetGainLinear
+    }
+}
+
+/// Audio Metering Helper (computes Peak & RMS in dB)
+public struct MeterCalculator {
+    public static func compute(
+        buffer: UnsafePointer<Float>,
+        frames: Int,
+        previousPeakL: Float,
+        previousPeakR: Float
+    ) -> MeterLevel {
+        if frames <= 0 {
+            return MeterLevel()
+        }
+
+        var maxL: Float = 0.0
+        var maxR: Float = 0.0
+        var sumSqL: Float = 0.0
+        var sumSqR: Float = 0.0
+
+        for i in 0..<frames {
+            let l = buffer[i * 2]
+            let r = buffer[i * 2 + 1]
+            let absL = abs(l)
+            let absR = abs(r)
+
+            if absL > maxL { maxL = absL }
+            if absR > maxR { maxR = absR }
+
+            sumSqL += l * l
+            sumSqR += r * r
+        }
+
+        let rmsL = sqrtf(sumSqL / Float(frames))
+        let rmsR = sqrtf(sumSqR / Float(frames))
+
+        let peakLDB = maxL > 1e-5 ? 20.0 * log10f(maxL) : -100.0
+        let peakRDB = maxR > 1e-5 ? 20.0 * log10f(maxR) : -100.0
+        let rmsLDB = rmsL > 1e-5 ? 20.0 * log10f(rmsL) : -100.0
+        let rmsRDB = rmsR > 1e-5 ? 20.0 * log10f(rmsR) : -100.0
+
+        // Peak decay (~0.95 per block)
+        let decayedPeakL = max(peakLDB, previousPeakL - 1.2)
+        let decayedPeakR = max(peakRDB, previousPeakR - 1.2)
+
+        return MeterLevel(
+            leftPeakDB: decayedPeakL,
+            rightPeakDB: decayedPeakR,
+            leftRMSDB: rmsLDB,
+            rightRMSDB: rmsRDB
+        )
+    }
+}

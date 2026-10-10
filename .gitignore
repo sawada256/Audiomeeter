@@ -1,0 +1,11 @@
+.build/
+*.app/
+*.driver/
+.DS_Store
+*.swp
+*.o
+*.log
+*.sample.txt
+.env*
+*.p12
+*.mobileprovision

@@ -1,0 +1,3 @@
+# Development rules
+
+This is the canonical Audiomeeter v1 source repository. Commit every coherent source/documentation/configuration change to local Git with a descriptive message after relevant verification. Never commit generated apps/drivers, build caches, recordings, user settings, logs, credentials, or signing keys. Preserve the separate installed legacy Voicemeeter application and its HAL drivers unless the user explicitly asks to migrate. Never publish or push without explicit authorization. Default language is Japanese; all app-owned UI and errors must also support English. Third-party plugin editors use their own localization.
