@@ -3,7 +3,7 @@ import Foundation
     static func main() {
         precondition(L10n.text("閉じる", language: "en") == "Close")
         precondition(L10n.text("閉じる", language: "ja") == "閉じる")
-        precondition(L10n.text("Mute", language: "ja") == "ミュート")
+        precondition(L10n.text("Mute", language: "ja") == "Mute")
         precondition(L10n.text("{0} フェーダー", ["A1"], language: "en") == "A1 fader")
         precondition(L10n.text("{0} フェーダー", ["{1}"], language: "en") == "{1} fader", "Arguments must not be interpreted as placeholders")
         for (key, value) in EnglishCatalog.strings {

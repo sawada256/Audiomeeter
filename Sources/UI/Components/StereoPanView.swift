@@ -7,12 +7,12 @@ struct StereoPanView: View {
     private var value: Float { appState.strips[strip]?.pan ?? 0 }
     var body: some View {
         HStack(spacing: 4) {
-            Text(L10n.text("PAN")).font(VMTheme.fontSmall)
+            Text(L10n.text("PAN")).font(VMTheme.fontSmall).frame(width: 28, alignment: .leading)
             PanTrack(value: value) { appState.setStripPan(strip: strip, pan: $0) }
-            Text(StereoPanControl.label(value)).font(VMTheme.fontSmall).frame(width: 28)
+            Text(StereoPanControl.label(value)).font(VMTheme.fontSmall).frame(width: 28, alignment: .trailing)
                 .contentShape(Rectangle())
                 .onTapGesture(count: 2) { appState.setStripPan(strip: strip, pan: 0) }
-        }.frame(height: 18).padding(.horizontal, 4)
+        }.frame(height: 22).padding(.horizontal, 4)
         .help(L10n.text("左右のバランス。中央付近でスナップ、ダブルクリックで中央"))
     }
 }

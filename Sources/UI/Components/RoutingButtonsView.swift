@@ -6,11 +6,13 @@ public struct LEDButton: View {
     public let isActive: Bool
     public let activeColor: Color
     public let action: () -> Void
+    public var fontSize: CGFloat = 10
 
-    public init(label: String, isActive: Bool, activeColor: Color, action: @escaping () -> Void) {
+    public init(label: String, isActive: Bool, activeColor: Color, fontSize: CGFloat = 10, action: @escaping () -> Void) {
         self.label = label
         self.isActive = isActive
         self.activeColor = activeColor
+        self.fontSize = fontSize
         self.action = action
     }
 
@@ -31,7 +33,9 @@ public struct LEDButton: View {
                 }
 
                 Text(label)
-                    .font(VMTheme.fontDigit)
+                    .font(.system(size: fontSize, weight: .bold, design: .monospaced))
+                    .lineLimit(1).minimumScaleFactor(0.75)
+                    .padding(.horizontal, 2)
                     .foregroundColor(isActive ? activeColor : VMTheme.ledInactiveText)
                     .shadow(color: isActive ? activeColor.opacity(0.8) : .clear, radius: isActive ? 3 : 0)
             }

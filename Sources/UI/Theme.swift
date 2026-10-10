@@ -57,7 +57,7 @@ public enum VMTheme {
 }
 
 public enum MixerLayout {
-    public static let stripHeight: CGFloat = 520
-    public static let controlsHeight: CGFloat = 164
+    public static let stripHeight: CGFloat = 560
+    public static let controlsHeight: CGFloat = 204
     public static let faderHeight: CGFloat = 170
 }

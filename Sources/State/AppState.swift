@@ -253,28 +253,28 @@ public final class AppState: ObservableObject {
 
     private func autoAssignVirtualDevices() {
         // 1. Virtual Input 1 (VAIO): Audiomeeter VAIO, Audiomeeter, or BlackHole 2ch
-        if let vaio = inputDevices.first(where: { $0.name == "Audiomeeter" || $0.name == "Audiomeeter VAIO" || $0.name == "BlackHole 2ch" }) {
+        if let vaio = inputDevices.first(where: { $0.name == "Voicemeeter" || $0.name == "Voicemeeter VAIO" || $0.name == "Audiomeeter" || $0.name == "Audiomeeter VAIO" || $0.name == "BlackHole 2ch" }) {
             if strips[.virtualVAIO]?.deviceUID == nil {
                 setStripDevice(strip: .virtualVAIO, device: vaio)
             }
         }
 
         // 2. Virtual Input 2 (AUX): Audiomeeter AUX or BlackHole 16ch
-        if let aux = inputDevices.first(where: { $0.name == "Audiomeeter AUX" || $0.name.contains("BlackHole 16ch") }) {
+        if let aux = inputDevices.first(where: { $0.name == "Voicemeeter AUX" || $0.name == "Audiomeeter AUX" || $0.name.contains("BlackHole 16ch") }) {
             if strips[.virtualAUX]?.deviceUID == nil {
                 setStripDevice(strip: .virtualAUX, device: aux)
             }
         }
 
         // 3. Virtual Output B1 (VAIO Out): Audiomeeter B1 ONLY (never assign to Audiomeeter playback!)
-        if let outB1 = outputDevices.first(where: { $0.name.contains("Audiomeeter B1") }) {
+        if let outB1 = outputDevices.first(where: { ["AudiomeeterB1_UID", "VoicemeeterB1_UID"].contains($0.uid) }) {
             if buses[.B1]?.deviceUID == nil {
                 setBusDevice(bus: .B1, device: outB1)
             }
         }
 
         // 4. Virtual Output B2 (AUX Out): Audiomeeter B2 ONLY (never assign to Audiomeeter AUX playback!)
-        if let outB2 = outputDevices.first(where: { $0.name.contains("Audiomeeter B2") }) {
+        if let outB2 = outputDevices.first(where: { ["AudiomeeterB2_UID", "VoicemeeterB2_UID"].contains($0.uid) }) {
             if buses[.B2]?.deviceUID == nil {
                 setBusDevice(bus: .B2, device: outB2)
             }
@@ -824,7 +824,7 @@ extension AppState {
         var defaultID: AudioObjectID = 0, size = UInt32(MemoryLayout<AudioObjectID>.size)
         if AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &defaultID) == noErr {
             let uid = deviceManager.findDevice(byID: defaultID)?.uid
-            let selected: StripID? = uid == "Audiomeeter_UID" ? .virtualVAIO : uid == "AudiomeeterAUX_UID" ? .virtualAUX : nil
+            let selected: StripID? = ["Audiomeeter_UID", "Voicemeeter_UID"].contains(uid) ? .virtualVAIO : ["AudiomeeterAUX_UID", "VoicemeeterAUX_UID"].contains(uid) ? .virtualAUX : nil
             if systemOutputStrip != selected { systemOutputStrip = selected }
         }
         for strip in [StripID.virtualVAIO, .virtualAUX] {

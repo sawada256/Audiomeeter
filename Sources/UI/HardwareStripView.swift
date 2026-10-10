@@ -63,6 +63,7 @@ public struct HardwareStripView: View {
             DualActionButton(title: "INSERTS • \((appState.insertConfigs[.strip(stripID)] ?? []).count) FX", isActive: appState.insertChainIsEnabled(.strip(stripID)), onLeftClick: { appState.toggleInsertChain(.strip(stripID)) }, onRightClick: { showInserts = true }, fontSize: 9)
                 .frame(height: 20)
                 .sheet(isPresented: $showInserts) { InsertRackView(appState: appState, target: .strip(stripID)) }
+                Spacer(minLength: 0)
                 StereoPanView(appState: appState, strip: stripID)
             }
             .frame(height: MixerLayout.controlsHeight, alignment: .top)

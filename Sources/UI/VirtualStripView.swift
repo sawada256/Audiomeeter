@@ -86,42 +86,19 @@ public struct VirtualStripView: View {
                 }
                 .padding(.vertical, 4)
 
-                // Karaoke / Center Cancel Button
-                Button(action: {
+                LEDButton(label: "KARAOKE (VOCAL CANCEL)", isActive: settings.isKaraoke,
+                          activeColor: VMTheme.ledMuteActive, fontSize: 8) {
                     appState.toggleStripKaraoke(strip: stripID)
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "music.mic")
-                            .font(.system(size: 9))
-                        Text(L10n.text("KARAOKE (VOCAL CANCEL)"))
-                            .font(.system(size: 8, weight: .bold))
-                    }
-                    .foregroundColor(settings.isKaraoke ? Color.white : VMTheme.textSecondary)
-                    .frame(maxWidth: .infinity, minHeight: 18)
-                    .background(settings.isKaraoke ? Color(red: 0.9, green: 0.15, blue: 0.45) : VMTheme.panelBackgroundDark)
-                    .cornerRadius(2)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 2)
-                            .stroke(settings.isKaraoke ? Color(red: 1.0, green: 0.3, blue: 0.6) : VMTheme.panelBorder, lineWidth: 1)
-                    )
-                    .shadow(color: settings.isKaraoke ? Color(red: 0.9, green: 0.15, blue: 0.45).opacity(0.8) : Color.clear, radius: 4)
                 }
-                .buttonStyle(PlainButtonStyle())
-                .padding(.horizontal, 4)
-
-                Button {
+                LEDButton(label: "APPS", isActive: showAppTrims, activeColor: VMTheme.textAccent, fontSize: 9) {
                     showAppTrims = true
-                } label: {
-                    Label("APPS", systemImage: "app.badge")
-                        .font(VMTheme.fontSmallBold)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(VMTheme.textAccent)
                 .help(L10n.text("この仮想デバイスに出力中のアプリとトリム"))
                 .sheet(isPresented: $showAppTrims) { AppTrimView(appState: appState, strip: stripID) }
                 DualActionButton(title: "INSERTS • \((appState.insertConfigs[.strip(stripID)] ?? []).count) FX", isActive: appState.insertChainIsEnabled(.strip(stripID)), onLeftClick: { appState.toggleInsertChain(.strip(stripID)) }, onRightClick: { showInserts = true }, fontSize: 9)
                     .frame(height: 20)
                     .sheet(isPresented: $showInserts) { InsertRackView(appState: appState, target: .strip(stripID)) }
+                Spacer(minLength: 0)
                 StereoPanView(appState: appState, strip: stripID)
             }
             .frame(height: MixerLayout.controlsHeight, alignment: .top)

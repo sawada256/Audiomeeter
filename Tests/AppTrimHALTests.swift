@@ -17,7 +17,8 @@ struct AppTrimHALTests {
             var n = UInt32(MemoryLayout.size(ofValue: uid))
             guard AudioObjectGetPropertyData(id, &a, 0, nil, &n, &uid) == noErr, let uid else { continue }
             let text = uid.takeRetainedValue() as String
-            guard ["Audiomeeter_UID", "AudiomeeterAUX_UID"].contains(text) else { continue }
+            let expectedUIDs = CommandLine.arguments.contains("--legacy") ? ["Voicemeeter_UID", "VoicemeeterAUX_UID"] : ["Audiomeeter_UID", "AudiomeeterAUX_UID"]
+            guard expectedUIDs.contains(text) else { continue }
             _ = try AppTrimTransport.read(id)
             let outputBytes = vm_counter_create()!
             defer { vm_counter_destroy(outputBytes) }

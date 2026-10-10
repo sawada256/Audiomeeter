@@ -57,7 +57,7 @@ public final class AudiomeeterEngine {
     private var feedbackBusTaps: [BusID: UnsafeMutablePointer<Float>] = [:]
     private var currentPans: [StripID: Float] = [:]
     private func internalBus(_ uid: String?) -> BusID? {
-        switch uid { case "AudiomeeterB1_UID": return .B1; case "AudiomeeterB2_UID": return .B2; default: return nil }
+        switch uid { case "AudiomeeterB1_UID", "VoicemeeterB1_UID": return .B1; case "AudiomeeterB2_UID", "VoicemeeterB2_UID": return .B2; default: return nil }
     }
     private var stripTaps: [StripID: UnsafeMutablePointer<Float>] = [:]
     private var stripHistories: [StripID: StereoSampleHistory] = [:]

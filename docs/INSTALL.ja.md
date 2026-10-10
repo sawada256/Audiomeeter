@@ -51,3 +51,7 @@ open Audiomeeter.app
 ## 検証
 
 `./Tests/run_audio_tests.sh`はオフライン回帰テストを実行します。実機HALテストは既定OFFで、専用デバイスの独占利用が必要です。`VM_TEST_INSTALLED_HAL=1`と`VM_TEST_DUPLEX_HAL=1`は音声アプリを終了した検証環境でのみ指定してください。最新の条件はテストスクリプトを確認してください。
+
+## 既存の個人用環境からの移行
+
+Audiomeeterは旧Voicemeeter仮想デバイスのUIDにも対応します。既存HALをそのまま使う場合、OS上のデバイス名はVoicemeeterのままです。旧アプリを終了してからAudiomeeterを使用し、両方のエンジンを同時実行しないでください。設定は別領域で保存します。日本語モードは旧版の英語ラベルと日本語説明を維持し、英語モードは日本語説明も英訳します。

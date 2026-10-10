@@ -1,6 +1,8 @@
 import Foundation
 @main struct BusRoutingTests {
     static func main() throws {
+        precondition(InternalBusRouting.source("VoicemeeterB1_UID") == .B1)
+        precondition(InternalBusRouting.source("VoicemeeterB2_UID") == .B2)
         precondition(StereoPanControl.normalized(-0.000001) == 0)
         precondition(StereoPanControl.normalized(0.05) == 0)
         precondition(StereoPanControl.normalized(-0.05) == 0)
@@ -19,7 +21,7 @@ import Foundation
         try engine.configureClock(rate:48000,frames:512)
         for strip in StripID.allCases { engine.updateStripSettings(strip:strip) { $0.routing = RoutingMatrix(); $0.dynamics = DynamicsConfig() } }
         engine.updateStripSettings(strip:.virtualVAIO) { $0.routing = RoutingMatrix(); $0.routing[returnBus] = true; $0.pan = 1 }
-        engine.updateStripSettings(strip:.hardware1) { $0.deviceUID = returnBus == .B1 ? "AudiomeeterB1_UID" : "AudiomeeterB2_UID"; $0.routing = RoutingMatrix(a1:true) }
+        engine.updateStripSettings(strip:.hardware1) { $0.deviceUID = returnBus == .B1 ? "VoicemeeterB1_UID" : "VoicemeeterB2_UID"; $0.routing = RoutingMatrix(a1:true) }
         let stereo = (0..<1024).map { $0 % 2 == 0 ? Float(0.1) : Float(0.2) }
         var previous = [Float](repeating:0,count:1024)
         for _ in 0..<8 {

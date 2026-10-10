@@ -344,7 +344,7 @@ public struct MeterLevel {
 /// Reject audible feedback cycles between internal return buses.
 public enum InternalBusRouting {
     public static func source(_ uid: String?) -> BusID? {
-        switch uid { case "AudiomeeterB1_UID": return .B1; case "AudiomeeterB2_UID": return .B2; default: return nil }
+        switch uid { case "AudiomeeterB1_UID", "VoicemeeterB1_UID": return .B1; case "AudiomeeterB2_UID", "VoicemeeterB2_UID": return .B2; default: return nil }
     }
     public static func hasCycle(_ strips: [StripID: StripSettings]) -> Bool {
         func reaches(_ current: BusID, _ target: BusID, _ visited: Set<BusID>) -> Bool {
