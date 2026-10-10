@@ -297,6 +297,24 @@ public struct StripSettings: Codable, Equatable {
     }
 }
 
+public enum BusProcessingStage: String, Codable, CaseIterable, Identifiable {
+    case preInserts, eq, fader, limiter, postInserts
+    public var id: String { rawValue }
+    public var title: String { switch self {
+    case .preInserts: return "PRE INSERTS"
+    case .postInserts: return "POST INSERTS"
+    case .eq: return "EQ"
+    case .fader: return "FADER / MODE"
+    case .limiter: return "LIMIT"
+    } }
+    public static let standard: [Self] = [.preInserts, .fader, .postInserts, .eq, .limiter]
+    public static func isValid(_ order: [Self]) -> Bool {
+        guard order.count == 5, Set(order).count == 5,
+              let pre = order.firstIndex(of: .preInserts), let fader = order.firstIndex(of: .fader), let post = order.firstIndex(of: .postInserts) else { return false }
+        return pre < fader && fader < post
+    }
+}
+
 public struct BusSettings: Codable, Equatable {
     public var deviceUID: String?
     public var channelOffset: Int? = nil
@@ -308,6 +326,8 @@ public struct BusSettings: Codable, Equatable {
     public var isEQEnabled: Bool
     public var eqConfig: MasterEQConfig
     public var delayMilliseconds: Double? = nil // Additional device calibration after plugin PDC.
+    public var limiterThresholdDB: Float? = nil
+    public var limiterCeilingDB: Float? = nil
     public var isLimiterEnabled: Bool? = true // nil preserves legacy settings
 
     public init(
@@ -328,6 +348,7 @@ public struct BusSettings: Codable, Equatable {
 }
 
 public struct MeterLevel {
+    public var limiterReductionDB: Float = 0
     public var leftPeakDB: Float
     public var rightPeakDB: Float
     public var leftRMSDB: Float

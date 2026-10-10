@@ -6,6 +6,7 @@ struct AudioSettingsView: View {
     @ObservedObject private var localization = LocalizationStore.shared
     @ObservedObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
+    @State private var showBusOrder = false
     @State private var rate: Double = 48000
     @State private var buffer: UInt32 = 256
     @State private var meters: Double = 30
@@ -30,6 +31,7 @@ struct AudioSettingsView: View {
             if appState.loginApprovalRequired {
                 Button(L10n.text("システム設定でログイン項目を許可")) { SMAppService.openSystemSettingsLoginItems() }
             }
+            Button(L10n.text("信号順序")) { showBusOrder = true }
             Form {
                 Picker(L10n.text("サンプルレート"), selection: $rate) {
                     ForEach([44100.0, 48000, 88200, 96000, 176400, 192000], id: \.self) { value in
@@ -103,6 +105,7 @@ struct AudioSettingsView: View {
         }
         .id(localization.language)
         .padding(24).frame(width: 560)
+        .sheet(isPresented: $showBusOrder) { BusOrderSettingsView(appState: appState) }
         .onAppear { rate = appState.engineSampleRate; buffer = appState.engineBufferSize; meters = appState.meterRefreshRate }
     }
     private func channelRow(name: String, device: String?, count: Int, left: Binding<Int>, right: Binding<Int>) -> some View {

@@ -44,6 +44,7 @@ public final class AudiomeeterEngine {
     private var realtimeBusMeters: [BusID: MeterLevel] = [:]
     public weak var recorderPlayer: AudioRecorderPlayer?
 
+    var busProcessingOrder = BusProcessingStage.standard // Mutate only with stopped audio.
     var inserts: [InsertTarget: [HostedInsert]] = [:] // Changed only with stopped IO.
     var disabledInsertTargets: Set<InsertTarget> = []
     var latencyCompensationEnabled = true
@@ -640,20 +641,23 @@ public final class AudiomeeterEngine {
                 playbackDelays[bus]?.process(routeScratch, frames: clampedFrames, delay: incomingLatency)
                 vDSP_vadd(bBuf, 1, routeScratch, 1, bBuf, 1, vDSP_Length(clampedFrames * 2))
 
-                let preLatency = processInserts(target: .bus(bus), position: .pre, buffer: bBuf, upstream: incomingLatency, frames: clampedFrames)
-                dsp.process(
-                    buffer: bBuf,
-                    frames: clampedFrames,
-                    sampleRate: Float(engineSampleRate),
-                    gainDB: setting.gainDB,
-                    isMuted: setting.isMuted,
-                    mode: setting.mode,
-                    isEQEnabled: setting.isEQEnabled,
-                    eqConfig: setting.eqConfig,
-                    limiterEnabled: setting.isLimiterEnabled ?? true
-                )
-
-                let processedLatency = processInserts(target: .bus(bus), position: .post, buffer: bBuf, upstream: preLatency, frames: clampedFrames)
+                var processedLatency = incomingLatency
+                for stage in busProcessingOrder {
+                    switch stage {
+                    case .preInserts, .postInserts:
+                        processedLatency = processInserts(target: .bus(bus), position: stage == .preInserts ? .pre : .post,
+                                                          buffer: bBuf, upstream: processedLatency, frames: clampedFrames)
+                    case .eq:
+                        if setting.isEQEnabled { dsp.processEQ(buffer: bBuf, frames: clampedFrames, sampleRate: Float(engineSampleRate), config: setting.eqConfig) }
+                    case .fader:
+                        dsp.process(buffer: bBuf, frames: clampedFrames, sampleRate: Float(engineSampleRate), gainDB: setting.gainDB,
+                                    isMuted: setting.isMuted, mode: setting.mode, limiterEnabled: false)
+                    case .limiter:
+                        dsp.processLimiter(buffer: bBuf, frames: clampedFrames, sampleRate: Float(engineSampleRate),
+                                           enabled: setting.isLimiterEnabled ?? true, thresholdDB: setting.limiterThresholdDB ?? -0.91515,
+                                           ceilingDB: setting.limiterCeilingDB ?? 0)
+                    }
+                }
                 let manualDelay = Int(min(500, max(0, setting.delayMilliseconds ?? 0)) * engineSampleRate / 1000)
                 busManualLatencies[bus.rawValue] = manualDelay
                 busDelays[bus]?.process(bBuf, frames: clampedFrames, delay: manualDelay)
@@ -680,12 +684,13 @@ public final class AudiomeeterEngine {
             busOutputDelays[bus]?.process(bBuf, frames: clampedFrames, delay: delay)
             // Compute Bus Meter
             let prevMeter = realtimeBusMeters[bus] ?? MeterLevel()
-            let newMeter = MeterCalculator.compute(
+            var newMeter = MeterCalculator.compute(
                 buffer: bBuf,
                 frames: clampedFrames,
                 previousPeakL: prevMeter.leftPeakDB,
                 previousPeakR: prevMeter.rightPeakDB
             )
+            newMeter.limiterReductionDB = setting.isMuted ? 0 : (busDSPs[bus]?.limiterReductionDB ?? 0)
             realtimeBusMeters[bus] = newMeter
 
             if dawOutputs[bus] != nil { dawRings[bus]?.write(from: bBuf, frameCount: clampedFrames) }

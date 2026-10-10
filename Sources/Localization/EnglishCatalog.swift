@@ -2,6 +2,10 @@ import Foundation
 
 enum EnglishCatalog {
     static let strings: [String: String] = [
+    "信号順序": "Signal Order",
+    "出力バスの信号順序（全バス共通）": "Output Bus Signal Order (All Buses)",
+    "PRE → FADER → POSTの関係を保ち、EQとLIMITを移動できます。変更時は音声が一時停止します。": "Move EQ and LIMIT while preserving PRE → FADER → POST. Audio briefly stops when changing the order.",
+    "先読みなしのソフトニー制限。Thresholdから圧縮し、Ceilingを超えないようにします。": "Zero-lookahead soft-knee limiting starts at Threshold and stays below Ceiling.",
     "ミキサーを表示": "Show Mixer",
     "VST3エフェクトを選択": "Choose a VST3 Effect",
     "閉じる": "Close",

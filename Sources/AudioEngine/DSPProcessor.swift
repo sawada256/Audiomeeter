@@ -456,9 +456,13 @@ public final class BusDSP {
     private var targetGainLinear: Float = 1.0
     private var eq = ParametricEQ6Band()
 
+    public private(set) var limiterReductionDB: Float = 0
+    private var limiterHoldFrames = 0
+
     public init() {}
 
     public func reset() {
+        limiterReductionDB = 0; limiterHoldFrames = 0
         eq.reset()
     }
 
@@ -473,12 +477,7 @@ public final class BusDSP {
         eqConfig: MasterEQConfig = MasterEQConfig(),
         limiterEnabled: Bool = true
     ) {
-        // Apply 6-Band Parametric EQ
-        if isEQEnabled {
-            eq.update(config: eqConfig, sampleRate: sampleRate)
-            eq.process(buffer: buffer, frames: frames)
-        }
-
+        if isEQEnabled { processEQ(buffer: buffer, frames: frames, sampleRate: sampleRate, config: eqConfig) }
         if isMuted || gainDB <= -59.5 {
             targetGainLinear = 0.0
         } else {
@@ -506,12 +505,6 @@ public final class BusDSP {
                 r = mono
             }
 
-            // Soft-knee Limiter to prevent harsh digital clipping
-            if limiterEnabled {
-                let threshold: Float = 0.9
-                if abs(l) > threshold { l = copysignf(threshold + 0.1 * tanhf((abs(l) - threshold) / 0.1), l) }
-                if abs(r) > threshold { r = copysignf(threshold + 0.1 * tanhf((abs(r) - threshold) / 0.1), r) }
-            }
             if !l.isFinite { l = 0 }
             if !r.isFinite { r = 0 }
 
@@ -519,6 +512,39 @@ public final class BusDSP {
             buffer[i * 2 + 1] = r
         }
         currentGainLinear = targetGainLinear
+        if limiterEnabled { processLimiter(buffer: buffer, frames: frames, sampleRate: sampleRate) }
+    }
+
+    public func processEQ(buffer: UnsafeMutablePointer<Float>, frames: Int, sampleRate: Float, config: MasterEQConfig) {
+        eq.update(config: config, sampleRate: sampleRate)
+        eq.process(buffer: buffer, frames: frames)
+    }
+
+    /// Zero-lookahead soft knee, preserving the original transfer curve by default.
+    public func processLimiter(buffer: UnsafeMutablePointer<Float>, frames: Int, sampleRate: Float,
+                               enabled: Bool = true, thresholdDB: Float = -0.91515, ceilingDB: Float = 0) {
+        guard enabled else { limiterReductionDB = 0; limiterHoldFrames = 0; return }
+        let ceiling = powf(10, min(0, max(-24, ceilingDB.isFinite ? ceilingDB : 0)) / 20)
+        let threshold = min(ceiling, powf(10, min(0, max(-36, thresholdDB.isFinite ? thresholdDB : -0.91515)) / 20))
+        let knee = max(0.000001, ceiling - threshold)
+        var maximumRatio: Float = 1
+        for i in 0..<(frames * 2) {
+            let input = buffer[i]
+            guard input.isFinite else { buffer[i] = 0; continue }
+            let magnitude = abs(input)
+            if magnitude > threshold {
+                let output = min(ceiling, threshold + knee * tanhf((magnitude - threshold) / knee))
+                buffer[i] = copysignf(output, input)
+                maximumRatio = max(maximumRatio, magnitude / max(0.000001, output))
+            }
+        }
+        let reduction = 20 * log10f(maximumRatio)
+        if reduction > 0.001 {
+            limiterReductionDB = reduction; limiterHoldFrames = Int(sampleRate * 0.15)
+        } else {
+            limiterHoldFrames = max(0, limiterHoldFrames - frames)
+            if limiterHoldFrames == 0 { limiterReductionDB = 0 }
+        }
     }
 }
 

@@ -17,6 +17,7 @@ public final class AppState: ObservableObject {
     // Strip Settings
     @Published public var strips: [StripID: StripSettings] = [:]
     // Bus Settings
+    @Published var busProcessingOrder = BusProcessingStage.standard
     @Published public var buses: [BusID: BusSettings] = [:]
 
     @Published public var eqPresets: [Int: [MasterEQConfig?]] = [:]
@@ -459,6 +460,21 @@ public final class AppState: ObservableObject {
         saveSettings()
     }
 
+    func setBusProcessingOrder(_ order: [BusProcessingStage]) {
+        guard BusProcessingStage.isValid(order) else { return }
+        engine.withStoppedAudio { engine.busProcessingOrder = order }
+        busProcessingOrder = order
+        saveSettings()
+    }
+
+    func setLimiterValues(bus: BusID, threshold: Float, ceiling: Float) {
+        let safeCeiling = min(0, max(-24, ceiling.isFinite ? ceiling : 0))
+        let safeThreshold = min(safeCeiling, max(-36, threshold.isFinite ? threshold : -0.91515))
+        buses[bus]?.limiterThresholdDB = safeThreshold; buses[bus]?.limiterCeilingDB = safeCeiling
+        engine.updateBusSettings(bus: bus) { $0.limiterThresholdDB = safeThreshold; $0.limiterCeilingDB = safeCeiling }
+        saveSettings()
+    }
+
     public func setBusLimiter(bus: BusID, enabled: Bool) {
         buses[bus]?.isLimiterEnabled = enabled
         engine.updateBusSettings(bus: bus) { $0.isLimiterEnabled = enabled }
@@ -586,6 +602,7 @@ public final class AppState: ObservableObject {
         var stripEQPresets: [Int: [EQ3Band?]]?
         var automaticDeviceRestart: Bool?
         var desktopControls: DesktopControlsPreferences?
+        var busProcessingOrder: [BusProcessingStage]?
         var insertChainEnabled: [Int: Bool]?
     }
 
@@ -613,6 +630,7 @@ public final class AppState: ObservableObject {
 
         let config = AppConfig(strips: rawStrips, buses: rawBuses, inserts: Dictionary(uniqueKeysWithValues: insertConfigs.map { ($0.key.id, $0.value) }), buffer: preferredBuffer, rate: preferredRate, meterRate: meterRefreshRate, appTrims: savedAppTrims, latencyCompensation: latencyCompensationEnabled, sidechainAlignment: sidechainAlignmentEnabled, eqPresets: eqPresets, stripEQPresets: stripEQPresets, automaticDeviceRestart: automaticDeviceRestart)
         var savedConfig = config
+        savedConfig.busProcessingOrder = busProcessingOrder
         savedConfig.outputBusAlignment = outputBusAlignmentEnabled
         savedConfig.desktopControls = desktopControls; savedConfig.insertChainEnabled = insertChainEnabled
         if let data = try? JSONEncoder().encode(savedConfig) {
@@ -624,6 +642,7 @@ public final class AppState: ObservableObject {
         guard let data = try? Data(contentsOf: settingsFileURL),
               let config = try? JSONDecoder().decode(AppConfig.self, from: data) else { return }
 
+        if let order = config.busProcessingOrder, BusProcessingStage.isValid(order) { busProcessingOrder = order; engine.busProcessingOrder = order }
         automaticDeviceRestart = config.automaticDeviceRestart ?? true
         desktopControls = config.desktopControls ?? DesktopControlsPreferences(); desktopControls.normalize()
         insertChainEnabled = config.insertChainEnabled ?? [:]

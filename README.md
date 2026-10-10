@@ -1,6 +1,6 @@
 # Audiomeeter v1
 
-[English](docs/README.en.md) · [インストール](docs/INSTALL.ja.md) · [検証・既知の課題](docs/AUDIT.ja.md) · [ライセンス整理](docs/LICENSING.ja.md)
+[出力バスの操作・処理順](docs/OUTPUT_BUS.ja.md) · [English](docs/README.en.md) · [インストール](docs/INSTALL.ja.md) · [検証・既知の課題](docs/AUDIT.ja.md) · [ライセンス整理](docs/LICENSING.ja.md)
 
 Apple Silicon / macOS 14以降向けのステレオ音声ミキサー。現在は個人用の非公開開発スナップショットです。VB-Audio製品とは独立した実装であり、同社の公式製品・互換製品ではありません。
 

@@ -42,6 +42,8 @@ ENGINE_TEST_SOURCES=(Sources/AudioEngine/AudioTypes.swift Sources/AudioEngine/Ri
 swiftc Sources/Localization/Localization.swift Sources/Localization/EnglishCatalog.swift Sources/Localization/JapaneseCatalog.swift -DVM_AUDIO_TESTS "${SWIFT_FLAGS[@]}" "${ENGINE_TEST_SOURCES[@]}" Tests/MixerLatencyTests.swift -o .build/audio-tests/mixer-latency
 .build/audio-tests/mixer-latency
 .build/audio-tests/mixer-latency --virtual
+swiftc Sources/Localization/Localization.swift Sources/Localization/EnglishCatalog.swift Sources/Localization/JapaneseCatalog.swift -DVM_AUDIO_TESTS "${SWIFT_FLAGS[@]}" "${ENGINE_TEST_SOURCES[@]}" Tests/BusProcessingTests.swift -o .build/audio-tests/bus-processing
+.build/audio-tests/bus-processing
 swiftc Sources/Localization/Localization.swift Sources/Localization/EnglishCatalog.swift Sources/Localization/JapaneseCatalog.swift -DVM_AUDIO_TESTS "${SWIFT_FLAGS[@]}" "${ENGINE_TEST_SOURCES[@]}" Tests/BusRoutingTests.swift -o .build/audio-tests/bus-routing
 .build/audio-tests/bus-routing
 .build/audio-tests/bus-routing --b2
