@@ -231,7 +231,7 @@ public struct EQWindowView: View {
             }
             .padding(.trailing,44)
             .overlay(alignment:.trailing) { if spectrumEnabled { SpectrumAxis().allowsHitTesting(false) } }
-            .frame(height: 200)
+            .frame(height: 270)
             }, capture: appState.spectrumCapture, bus: bus)
 
             Divider().background(VMTheme.panelBorder)

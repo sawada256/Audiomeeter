@@ -17,3 +17,5 @@ SPECTRUM in the EQ editor toggles analysis. Defaults: OFF, 8192-point Hann FFT, 
 EQ placement is before the INSERT group, after it / before LIMIT, or after LIMIT. After INSERT and before LIMIT are equivalent in the fixed PRE → FADER → POST → LIMIT chain.
 
 Build 6 overlays the spectrum on the restored 200 pt EQ plot, sharing its 20 Hz–20 kHz frequency axis. EQ gain is on the left; slope-adjusted spectrum levels are on the right. Response → Fast selects 2048-point FFT, 30 ms averaging and up to 60 fps. FFT, Avg and FPS remain individually adjustable; Avg 0 ms disables averaging. Shorter windows respond faster but reduce frequency resolution, especially in the bass.
+
+Build 7 increases the shared graph to 270 pt by using the remaining vertical space. On smaller screens, vertical scrolling keeps all controls accessible.
