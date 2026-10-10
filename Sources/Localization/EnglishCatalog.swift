@@ -2,6 +2,9 @@ import Foundation
 
 enum EnglishCatalog {
     static let strings: [String: String] = [
+    "EQ直後 • L/Rパワー平均 • 表示傾斜のみ（音声は変化しません） • 20 fps": "Post-EQ • L/R power average • Display slope only (audio unchanged) • 20 fps",
+    "右クリックでPAD切替、ダブルクリックで中央。FORMANTは共鳴帯域を動かす試験用音色処理です。": "Right-click to cycle PADs; double-click to center. FORMANT is experimental resonance coloration.",
+    "INSERTの後とLIMITの前は同じ位置です。EQはINSERT群の途中には入りません。変更時は音声が一時停止します。": "After INSERT and before LIMIT are the same position. EQ stays outside the INSERT group. Audio briefly stops when changing the order.",
     "信号順序": "Signal Order",
     "出力バスの信号順序（全バス共通）": "Output Bus Signal Order (All Buses)",
     "PRE → FADER → POSTの関係を保ち、EQとLIMITを移動できます。変更時は音声が一時停止します。": "Move EQ and LIMIT while preserving PRE → FADER → POST. Audio briefly stops when changing the order.",

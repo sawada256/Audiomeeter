@@ -44,6 +44,7 @@ public final class AudiomeeterEngine {
     private var realtimeBusMeters: [BusID: MeterLevel] = [:]
     public weak var recorderPlayer: AudioRecorderPlayer?
 
+    let spectrumCapture = SpectrumCapture()
     var busProcessingOrder = BusProcessingStage.standard // Mutate only with stopped audio.
     var inserts: [InsertTarget: [HostedInsert]] = [:] // Changed only with stopped IO.
     var disabledInsertTargets: Set<InsertTarget> = []
@@ -593,10 +594,13 @@ public final class AudiomeeterEngine {
                     intellipan: setting.intellipan,
                     eq: setting.eq,
                     isVirtual: strip.isVirtual,
-                    isKaraoke: setting.isKaraoke
+                    isKaraoke: setting.isKaraoke,
+                    padMode: setting.padMode ?? .intellipan,
+                    padState: setting.padMode == .pitch ? (setting.padPitch ?? IntellipanState()) : setting.padMode == .formant ? (setting.padFormant ?? IntellipanState()) : (setting.padModulation ?? IntellipanState()),
+                    pitchSmooth: setting.pitchSmooth ?? false
                 )
 
-                let pan = min(1, max(-1, setting.pan ?? 0))
+                let pan = min(1, max(-1, (strip.isVirtual || setting.padMode == .pan) ? (setting.pan ?? 0) : 0))
                 var smoothedPan = currentPans[strip] ?? 0
                 let panStep = (pan - smoothedPan) / Float(clampedFrames)
                 for frame in 0..<clampedFrames {
@@ -605,7 +609,7 @@ public final class AudiomeeterEngine {
                     mixBuf[frame * 2 + 1] *= smoothedPan < 0 ? 1 + smoothedPan : 1
                 }
                 currentPans[strip] = pan
-                nodeLatencies[node] = processInserts(target: .strip(strip), position: .post, buffer: mixBuf, upstream: preLatency, frames: clampedFrames)
+                nodeLatencies[node] = processInserts(target: .strip(strip), position: .post, buffer: mixBuf, upstream: preLatency + (strip.isVirtual ? 0 : InputPadDSP.latencyFrames(mode: setting.padMode ?? .intellipan, smooth: setting.pitchSmooth ?? false, rate: Float(engineSampleRate))), frames: clampedFrames)
                 if effectivelyMuted { memset(mixBuf, 0, clampedFrames * 8) }
                 stripHistories[strip]?.write(mixBuf, frames: clampedFrames)
                 // Compute Strip Meter
@@ -649,6 +653,7 @@ public final class AudiomeeterEngine {
                                                           buffer: bBuf, upstream: processedLatency, frames: clampedFrames)
                     case .eq:
                         if setting.isEQEnabled { dsp.processEQ(buffer: bBuf, frames: clampedFrames, sampleRate: Float(engineSampleRate), config: setting.eqConfig) }
+                        spectrumCapture.write(bus: bus, buffer: bBuf, frames: clampedFrames, sampleRate: Float(engineSampleRate))
                     case .fader:
                         dsp.process(buffer: bBuf, frames: clampedFrames, sampleRate: Float(engineSampleRate), gainDB: setting.gainDB,
                                     isMuted: setting.isMuted, mode: setting.mode, limiterEnabled: false)

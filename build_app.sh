@@ -35,7 +35,7 @@ cat << 'WORKER_EOF' > "$WORKER_CONTENTS/Info.plist"
 <key>CFBundleName</key><string>Audiomeeter Plugin</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>1.0.0</string>
-<key>CFBundleVersion</key><string>4</string>
+<key>CFBundleVersion</key><string>5</string>
 <key>LSUIElement</key><true/>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSHighResolutionCapable</key><true/>
@@ -67,7 +67,7 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
     <key>CFBundleShortVersionString</key>
     <string>1.0.0</string>
     <key>CFBundleVersion</key>
-    <string>4</string>
+    <string>5</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSHighResolutionCapable</key>

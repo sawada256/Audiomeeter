@@ -362,6 +362,7 @@ public final class StripDSP {
     private var highFilter = BiquadFilter()
     private var dynamics = DynamicsProcessor()
     private var karaoke = KaraokeProcessor()
+    private let padDSP = InputPadDSP()
     private var lastEQ: EQ3Band?
     private var lastEQRate: Float = 0
 
@@ -373,6 +374,7 @@ public final class StripDSP {
         highFilter.reset()
         dynamics.reset()
         karaoke.reset()
+        padDSP.reset()
     }
 
     /// Process input strip audio in-place
@@ -386,7 +388,8 @@ public final class StripDSP {
         intellipan: IntellipanState,
         eq: EQ3Band,
         isVirtual: Bool,
-        isKaraoke: Bool = false
+        isKaraoke: Bool = false,
+        padMode: InputPadMode = .intellipan, padState: IntellipanState = IntellipanState(), pitchSmooth: Bool = false
     ) {
         if isMuted || gainDB <= -59.5 {
             targetGainLinear = 0.0
@@ -431,8 +434,10 @@ public final class StripDSP {
             }
         }
 
-        // Intellipan (Voice Color / Pan)
-        let pan = max(-1.0, min(1.0, intellipan.x))
+        if !isVirtual { padDSP.process(buffer: buffer, frames: frames, rate: sampleRate, mode: padMode,
+                                      state: padMode == .intellipan ? intellipan : padState, smooth: pitchSmooth) }
+        // Only the color PAD uses its horizontal coordinate as balance.
+        let pan = max(-1.0, min(1.0, (isVirtual || padMode == .intellipan) ? intellipan.x : 0))
         let panL = cosf(max(0, pan) * Float.pi / 2.0)
         let panR = cosf(max(0, -pan) * Float.pi / 2.0)
 

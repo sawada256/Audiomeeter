@@ -5,7 +5,6 @@ public struct TapeRecorderView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var recorderPlayer: AudioRecorderPlayer
 
-    @State private var reelRotation: Double = 0.0
 
     public init(appState: AppState) {
         self.appState = appState
@@ -196,7 +195,7 @@ public struct TapeRecorderView: View {
                             }
                             .labelsHidden()
                             .pickerStyle(MenuPickerStyle())
-                            .frame(width: 110)
+                            .frame(width: 190)
                         }
 
                         RecorderSourceMeter(meters: appState.meterStore, source: recorderPlayer.recordingSource)
@@ -217,7 +216,7 @@ public struct TapeRecorderView: View {
                             }
                             .labelsHidden()
                             .pickerStyle(MenuPickerStyle())
-                            .frame(width: 100)
+                            .frame(width: 155)
                         }
                     }
                 }
@@ -338,9 +337,10 @@ private struct RecorderSourceMeter: View {
 /// Animated Tape Reel
 private struct TapeReelView: View {
     let isSpinning: Bool
-    @State private var angle: Double = 0.0
 
     var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0/15, paused: !isSpinning)) { time in
+        let angle = isSpinning ? time.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 2) * 180 : 0
         ZStack {
             Circle()
                 .fill(Color(red: 0.18, green: 0.20, blue: 0.24))
@@ -359,21 +359,6 @@ private struct TapeReelView: View {
                 .fill(Color.black)
                 .frame(width: 14, height: 14)
         }
-        .onAppear {
-            if isSpinning {
-                startRotation()
-            }
-        }
-        .onChange(of: isSpinning) { _, spinning in
-            if spinning {
-                startRotation()
-            }
-        }
-    }
-
-    private func startRotation() {
-        withAnimation(Animation.linear(duration: 2.0).repeatForever(autoreverses: false)) {
-            angle = 360.0
         }
     }
 }

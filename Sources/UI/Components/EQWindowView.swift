@@ -26,6 +26,7 @@ public struct EQWindowView: View {
     ]
 
     public var body: some View {
+        ScrollView(.vertical) {
         VStack(spacing: 0) {
             // Header Bar
             HStack(spacing: 12) {
@@ -104,6 +105,8 @@ public struct EQWindowView: View {
                 Spacer()
             }
             .controlSize(.small).padding(.horizontal, 16).padding(.vertical, 8)
+
+            SpectrumAnalyzerView(capture: appState.spectrumCapture, bus: bus)
 
             // Frequency Response Graph (Logarithmic 20Hz - 20kHz, -18dB - +18dB)
             GeometryReader { geo in
@@ -224,7 +227,7 @@ public struct EQWindowView: View {
                     }
                 }
             }
-            .frame(height: 200)
+            .frame(height: 150)
 
             Divider().background(VMTheme.panelBorder)
 
@@ -239,6 +242,7 @@ public struct EQWindowView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }
+            .frame(height: 276)
             .background(VMTheme.panelBackgroundDark)
 
             Divider().background(VMTheme.panelBorder)
@@ -266,7 +270,8 @@ public struct EQWindowView: View {
             .padding(.vertical, 8)
             .background(VMTheme.panelBackgroundDark)
         }
-        .frame(minWidth: 800, maxWidth: 840, minHeight: 600, maxHeight: 640)
+        }
+        .frame(width: 820, height: min(720, max(500, (NSScreen.main?.visibleFrame.height ?? 800) - 60)))
         .background(VMTheme.backgroundDark)
         .cornerRadius(8)
         .overlay(

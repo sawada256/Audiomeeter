@@ -1,6 +1,6 @@
 # Audiomeeter v1
 
-[出力バスの操作・処理順](docs/OUTPUT_BUS.ja.md) · [English](docs/README.en.md) · [インストール](docs/INSTALL.ja.md) · [検証・既知の課題](docs/AUDIT.ja.md) · [ライセンス整理](docs/LICENSING.ja.md)
+[入力PAD・スペアナ](docs/PADS_SPECTRUM.ja.md) · [出力バスの操作・処理順](docs/OUTPUT_BUS.ja.md) · [English](docs/README.en.md) · [インストール](docs/INSTALL.ja.md) · [検証・既知の課題](docs/AUDIT.ja.md) · [ライセンス整理](docs/LICENSING.ja.md)
 
 Apple Silicon / macOS 14以降向けのステレオ音声ミキサー。現在は個人用の非公開開発スナップショットです。VB-Audio製品とは独立した実装であり、同社の公式製品・互換製品ではありません。
 
@@ -8,6 +8,7 @@ Apple Silicon / macOS 14以降向けのステレオ音声ミキサー。現在�
 
 - 物理入力3系統、仮想入力VAIO/AUX、出力A1–A3/B1/B2のルーティング。
 - フェーダー、ミュート、ソロ、ステレオPAN、EQとプリセット、ダイナミクス。
+- 物理入力の切替式PAN／音色／モジュレーション／ピッチ／試験用FORMANT PAD、ON/OFF式EQスペアナ。
 - デバイスが公開するチャンネル数に応じた左右の物理チャンネル選択。
 - ARM64 VST3エフェクトのプロセス分離、入力／出力のPRE/POSTインサート、サイドチェイン、遅延補正。
 - 専用HALドライバーによる仮想デバイス、VAIO/B1・AUX/B2の全二重接続、アプリ別トリム。

@@ -29,14 +29,7 @@ public struct HardwareStripView: View {
             headerView
 
             VStack(spacing: 3) {
-                // Intellipan 2D Pad
-                IntellipanPadView(
-                    state: Binding(
-                        get: { settings.intellipan },
-                        set: { appState.setStripIntellipan(strip: stripID, x: $0.x, y: $0.y) }
-                    ),
-                    size: 58
-                )
+                InputPadView(appState: appState, strip: stripID)
 
                 // Dynamics Knobs (Comp & Gate)
                 HStack(spacing: 8) {
@@ -64,7 +57,6 @@ public struct HardwareStripView: View {
                 .frame(height: 20)
                 .sheet(isPresented: $showInserts) { InsertRackView(appState: appState, target: .strip(stripID)) }
                 Spacer(minLength: 0)
-                StereoPanView(appState: appState, strip: stripID)
             }
             .frame(height: MixerLayout.controlsHeight, alignment: .top)
 

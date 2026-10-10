@@ -17,6 +17,7 @@ public final class AppState: ObservableObject {
     // Strip Settings
     @Published public var strips: [StripID: StripSettings] = [:]
     // Bus Settings
+    @Published var busEQPosition = BusEQPosition.beforeLimiter
     @Published var busProcessingOrder = BusProcessingStage.standard
     @Published public var buses: [BusID: BusSettings] = [:]
 
@@ -24,6 +25,7 @@ public final class AppState: ObservableObject {
     @Published public var stripEQPresets: [Int: [EQ3Band?]] = [:]
 
     // Meter readings (0...1 normalized for UI display)
+    var spectrumCapture: SpectrumCapture { engine.spectrumCapture }
     let meterStore = MixerMeterStore()
     public var stripMeters: [StripID: MeterLevel] {
         get { meterStore.frame.strips }
@@ -411,6 +413,24 @@ public final class AppState: ObservableObject {
         saveSettings()
     }
 
+    func setInputPad(strip: StripID, mode: InputPadMode? = nil, state: IntellipanState? = nil, smooth: Bool? = nil) {
+        guard var s = strips[strip] else { return }
+        if let mode { s.padMode = mode }
+        if let smooth { s.pitchSmooth = smooth }
+        if let state {
+            switch s.padMode ?? .intellipan {
+            case .intellipan: s.intellipan = state
+            case .pan: s.pan = state.x
+            case .modulation: s.padModulation = state
+            case .pitch: s.padPitch = state
+            case .formant: s.padFormant = state
+            }
+        }
+        strips[strip] = s
+        engine.updateStripSettings(strip: strip) { $0 = s }
+        saveSettings()
+    }
+
     public func setStripIntellipan(strip: StripID, x: Float, y: Float) {
         strips[strip]?.intellipan = IntellipanState(x: x, y: y)
         engine.updateStripSettings(strip: strip) { $0.intellipan = IntellipanState(x: x, y: y) }
@@ -457,6 +477,12 @@ public final class AppState: ObservableObject {
         s.isKaraoke.toggle()
         strips[strip] = s
         engine.updateStripSettings(strip: strip) { $0.isKaraoke = s.isKaraoke }
+        saveSettings()
+    }
+
+    func setBusEQPosition(_ position: BusEQPosition) {
+        engine.withStoppedAudio { engine.busProcessingOrder = position.order }
+        busEQPosition = position; busProcessingOrder = position.order
         saveSettings()
     }
 
@@ -602,6 +628,7 @@ public final class AppState: ObservableObject {
         var stripEQPresets: [Int: [EQ3Band?]]?
         var automaticDeviceRestart: Bool?
         var desktopControls: DesktopControlsPreferences?
+        var busEQPosition: BusEQPosition?
         var busProcessingOrder: [BusProcessingStage]?
         var insertChainEnabled: [Int: Bool]?
     }
@@ -630,6 +657,7 @@ public final class AppState: ObservableObject {
 
         let config = AppConfig(strips: rawStrips, buses: rawBuses, inserts: Dictionary(uniqueKeysWithValues: insertConfigs.map { ($0.key.id, $0.value) }), buffer: preferredBuffer, rate: preferredRate, meterRate: meterRefreshRate, appTrims: savedAppTrims, latencyCompensation: latencyCompensationEnabled, sidechainAlignment: sidechainAlignmentEnabled, eqPresets: eqPresets, stripEQPresets: stripEQPresets, automaticDeviceRestart: automaticDeviceRestart)
         var savedConfig = config
+        savedConfig.busEQPosition = busEQPosition
         savedConfig.busProcessingOrder = busProcessingOrder
         savedConfig.outputBusAlignment = outputBusAlignmentEnabled
         savedConfig.desktopControls = desktopControls; savedConfig.insertChainEnabled = insertChainEnabled
@@ -642,7 +670,8 @@ public final class AppState: ObservableObject {
         guard let data = try? Data(contentsOf: settingsFileURL),
               let config = try? JSONDecoder().decode(AppConfig.self, from: data) else { return }
 
-        if let order = config.busProcessingOrder, BusProcessingStage.isValid(order) { busProcessingOrder = order; engine.busProcessingOrder = order }
+        busEQPosition = config.busEQPosition ?? BusEQPosition.migrated(config.busProcessingOrder)
+        busProcessingOrder = busEQPosition.order; engine.busProcessingOrder = busEQPosition.order
         automaticDeviceRestart = config.automaticDeviceRestart ?? true
         desktopControls = config.desktopControls ?? DesktopControlsPreferences(); desktopControls.normalize()
         insertChainEnabled = config.insertChainEnabled ?? [:]

@@ -22,12 +22,12 @@ public struct SingleBusStripView: View {
             ForEach(appState.busProcessingOrder) { stage in
                 switch stage {
                 case .eq:
-                    VStack(spacing: 2) {
+                    VStack(spacing: 0) {
                         EQButton(isActive: settings.isEQEnabled, onLeftClick: { appState.toggleBusEQ(bus: busID) }, onRightClick: { showEQWindow = true })
                         EQMiniCurve(config: settings.eqConfig, enabled: settings.isEQEnabled, sampleRate: Float(appState.engineSampleRate))
                             .frame(height: 29).contentShape(Rectangle()).onTapGesture { showEQWindow = true }
                             .accessibilityLabel("EQ Preview").accessibilityAddTraits(.isButton)
-                    }
+                    }.background(VMTheme.grooveDark).overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.cyan.opacity(0.3), lineWidth: 1))
                 case .preInserts:
                     insertPreview
                 case .postInserts, .fader:
@@ -178,7 +178,7 @@ private struct LiveLimiterButton: View {
     let edit: () -> Void
     var body: some View {
         let reducing = enabled && (meters.frame.buses[bus]?.limiterReductionDB ?? 0) > 0.001
-        TimelineView(.periodic(from: .now, by: 0.12)) { time in
+        TimelineView(.animation(minimumInterval: 0.12, paused: !reducing)) { time in
             let red = reducing && Int(time.date.timeIntervalSince1970 / 0.12) % 2 == 0
             DualActionButton(title: "LIMIT", isActive: enabled, onLeftClick: toggle, onRightClick: edit,
                              activeColor: red ? .systemRed : .systemCyan)
@@ -217,38 +217,20 @@ struct LimiterSettingsView: View {
 struct BusOrderSettingsView: View {
     @ObservedObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
-    private func moved(_ index: Int, _ delta: Int) -> [BusProcessingStage] {
-        var order = appState.busProcessingOrder
-        guard order.indices.contains(index + delta) else { return [] }
-        order.swapAt(index, index + delta); return order
-    }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(L10n.text("出力バスの信号順序（全バス共通）")).font(.headline)
-            Text(L10n.text("PRE → FADER → POSTの関係を保ち、EQとLIMITを移動できます。変更時は音声が一時停止します。"))
+            Picker("EQ Position", selection: Binding(get: { appState.busEQPosition }, set: { appState.setBusEQPosition($0) })) {
+                ForEach(BusEQPosition.allCases, id: \.rawValue) { position in Text(position.title).tag(position) }
+            }
+            Text("PRE INSERT → FADER → POST INSERT → LIMIT").font(.caption.monospaced())
+            Text(L10n.text("INSERTの後とLIMITの前は同じ位置です。EQはINSERT群の途中には入りません。変更時は音声が一時停止します。"))
                 .font(.caption)
-            Picker("EQ Position", selection: Binding(get: { appState.busProcessingOrder.firstIndex(of: .eq) ?? 3 }, set: { index in
-                var order = appState.busProcessingOrder.filter { $0 != .eq }
-                order.insert(.eq, at: index)
-                appState.setBusProcessingOrder(order)
-            })) {
-                let other = appState.busProcessingOrder.filter { $0 != .eq }
-                ForEach(0..<5) { index in
-                    Text("\(index == 0 ? "INPUT" : other[index - 1].title) → EQ → \(index == 4 ? "OUTPUT" : other[index].title)").tag(index)
-                }
-            }
-            ForEach(Array(appState.busProcessingOrder.enumerated()), id: \.element) { index, stage in
-                HStack {
-                    Text(stage.title).frame(maxWidth: .infinity, alignment: .leading)
-                    Button("↑") { appState.setBusProcessingOrder(moved(index, -1)) }.disabled(!BusProcessingStage.isValid(moved(index, -1)))
-                    Button("↓") { appState.setBusProcessingOrder(moved(index, 1)) }.disabled(!BusProcessingStage.isValid(moved(index, 1)))
-                }
-            }
             HStack {
-                Button("Reset") { appState.setBusProcessingOrder(BusProcessingStage.standard) }
+                Button("Reset") { appState.setBusEQPosition(.beforeLimiter) }
                 Spacer(); Button(L10n.text("閉じる")) { dismiss() }
             }
-        }.padding(24).frame(width: 430)
+        }.padding(24).frame(width: 470)
     }
 }
 

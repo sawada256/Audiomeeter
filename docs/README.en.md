@@ -7,3 +7,11 @@ Three hardware inputs, VAIO/AUX virtual inputs, A1–A3/B1/B2 output buses, ster
 Japanese is the default. Switch to English in Audio Settings → 言語 / Language. Third-party plugin editors, native OS authorization dialogs, and device/application names remain controlled by their vendors or the OS.
 
 Build using `./build_app.sh` and verify with `./Tests/run_audio_tests.sh`. See [installation](INSTALL.en.md). No Git remote is configured. A release license for project-owned code has not been selected; this is not a cleared-for-distribution release. Read [licensing](LICENSING.ja.md) and [audit / release blockers](AUDIT.ja.md) before publishing.
+
+## Input PADs and spectrum analyzer (build 5)
+
+Choose PAN, INTELLIPAN, MODULATION, PITCH or FORMANT (EXP) from a hardware input PAD menu. Right-click cycles modes; double-click centers. INTELLIPAN brightness uses low/high shelves, not high/low-pass filtering. Modulation is stereo chorus. Pitch spans ±12 semitones; the menu selects nominal ~10 ms or ~20 ms latency, included in path compensation. Granular artifacts are possible, and its time-varying read delay is not exact phase alignment. FORMANT is experimental shifting of fixed vowel-like resonances, without pitch changes or envelope analysis/resynthesis.
+
+SPECTRUM in the EQ editor toggles analysis. Defaults: OFF, 8192-point Hann FFT, 300 ms averaging, 1/6-octave smoothing, +3.01 dB/oct display slope for flat pink-noise power. Analysis stops when disabled or the editor closes. FFT runs on a utility queue; only the spectrum plot observes its 20 fps frames. Recorder reels update only while active, at 15 fps.
+
+EQ placement is before the INSERT group, after it / before LIMIT, or after LIMIT. After INSERT and before LIMIT are equivalent in the fixed PRE → FADER → POST → LIMIT chain.

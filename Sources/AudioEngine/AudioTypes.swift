@@ -259,6 +259,8 @@ public enum BusMode: String, CaseIterable, Identifiable, Codable {
     public var id: String { rawValue }
 }
 
+public enum InputPadMode: String, Codable, CaseIterable { case intellipan = "INTELLIPAN", pan = "PAN", modulation = "MODULATION", pitch = "PITCH", formant = "FORMANT (EXP)" }
+
 public struct StripSettings: Codable, Equatable {
     public var deviceUID: String?
     public var channelOffset: Int? = nil
@@ -272,6 +274,11 @@ public struct StripSettings: Codable, Equatable {
     public var dynamics: DynamicsConfig
     public var eq: EQ3Band
     public var isKaraoke: Bool        // Vocal / Center Cancel
+    public var padMode: InputPadMode? = nil
+    public var padModulation: IntellipanState? = nil
+    public var padPitch: IntellipanState? = nil
+    public var padFormant: IntellipanState? = nil
+    public var pitchSmooth: Bool? = nil
     public var pan: Float? = nil // Stereo balance: -1 left, 0 center, +1 right.
 
     public init(
@@ -294,6 +301,27 @@ public struct StripSettings: Codable, Equatable {
         self.dynamics = dynamics
         self.eq = eq
         self.isKaraoke = isKaraoke
+    }
+}
+
+public enum BusEQPosition: String, Codable, CaseIterable {
+    case beforeInserts, afterInserts, beforeLimiter, afterLimiter
+    public var title: String { switch self {
+    case .beforeInserts: return "EQ → INSERT → LIMIT"
+    case .afterInserts: return "INSERT → EQ → LIMIT (After INSERT)"
+    case .beforeLimiter: return "INSERT → EQ → LIMIT (Before LIMIT)"
+    case .afterLimiter: return "INSERT → LIMIT → EQ"
+    } }
+    public var order: [BusProcessingStage] { switch self {
+    case .beforeInserts: return [.eq, .preInserts, .fader, .postInserts, .limiter]
+    case .afterInserts, .beforeLimiter: return [.preInserts, .fader, .postInserts, .eq, .limiter]
+    case .afterLimiter: return [.preInserts, .fader, .postInserts, .limiter, .eq]
+    } }
+    public static func migrated(_ order: [BusProcessingStage]?) -> Self {
+        guard let order, BusProcessingStage.isValid(order), let eq = order.firstIndex(of: .eq) else { return .beforeLimiter }
+        if eq < order.firstIndex(of: .preInserts)! { return .beforeInserts }
+        if eq > order.firstIndex(of: .limiter)! { return .afterLimiter }
+        return .beforeLimiter
     }
 }
 
