@@ -28,14 +28,10 @@ public struct SingleBusStripView: View {
                             .frame(height: 29).contentShape(Rectangle()).onTapGesture { showEQWindow = true }
                             .accessibilityLabel("EQ Preview").accessibilityAddTraits(.isButton)
                     }
-                case .preInserts, .postInserts:
-                    insertPreview(position: stage == .preInserts ? .pre : .post)
-                case .fader:
-                    HStack(spacing: 2) {
-                        Rectangle().frame(height: 1)
-                        Text("FADER").font(.system(size: 7, weight: .semibold)).fixedSize()
-                        Rectangle().frame(height: 1)
-                    }.foregroundStyle(VMTheme.textSecondary).frame(height: 10)
+                case .preInserts:
+                    insertPreview
+                case .postInserts, .fader:
+                    EmptyView() // Both are represented inside the unified INSERT panel.
                 case .limiter:
                     LiveLimiterButton(meters: appState.meterStore, bus: busID, enabled: settings.isLimiterEnabled ?? true,
                                       toggle: { appState.setBusLimiter(bus: busID, enabled: !(settings.isLimiterEnabled ?? true)) },
@@ -58,27 +54,57 @@ public struct SingleBusStripView: View {
             .sheet(isPresented: $showLimiter) { LimiterSettingsView(appState: appState, bus: busID) }
     }
 
-    private func insertPreview(position: InsertPosition) -> some View {
-        let slots = (appState.insertConfigs[.bus(busID)] ?? []).filter { $0.position == position }
-        return VStack(spacing: 2) {
-            DualActionButton(title: "\(position.rawValue) INSERTS · \(slots.count)", isActive: appState.insertChainIsEnabled(.bus(busID)),
-                             onLeftClick: { appState.toggleInsertChain(.bus(busID)) }, onRightClick: { showInserts = true }, fontSize: 7)
-                .frame(height: 20).help(L10n.text("左クリック: ON/OFF、右クリック: 編集"))
-            ScrollView(.vertical, showsIndicators: slots.count > 2) {
-                VStack(spacing: 2) {
-                    if slots.isEmpty { Text("—").font(VMTheme.fontSmall).foregroundStyle(.secondary).frame(height: 16) }
-                    ForEach(slots, id: \.id) { slot in
-                        DualActionButton(title: slot.name, isActive: !slot.bypassed,
-                                         onLeftClick: { appState.changeInsert(target: .bus(busID), id: slot.id, bypass: !slot.bypassed) },
-                                         onRightClick: { appState.editInsert(target: .bus(busID), id: slot.id) }, fontSize: 8)
-                            .frame(height: 16).help(slot.name)
-                    }
-                }.padding(.horizontal, 2)
-            }.frame(height: 34)
-        }.padding(.bottom, 3)
-            .background(VMTheme.textAccent.opacity(0.07))
-            .overlay(RoundedRectangle(cornerRadius: 3).stroke(VMTheme.textAccent.opacity(0.22), lineWidth: 1))
+    private var faderBoundary: some View {
+        HStack(spacing: 2) {
+            Rectangle().frame(height: 1)
+            Text("FADER").font(.system(size: 7, weight: .semibold)).fixedSize()
+            Rectangle().frame(height: 1)
+        }.foregroundStyle(VMTheme.textSecondary).frame(height: 10)
     }
+
+    private func insertRow(_ slot: InsertConfig) -> some View {
+        DualActionButton(title: slot.name, isActive: !slot.bypassed,
+                         onLeftClick: { appState.changeInsert(target: .bus(busID), id: slot.id, bypass: !slot.bypassed) },
+                         onRightClick: { appState.editInsert(target: .bus(busID), id: slot.id) }, fontSize: 8)
+            .frame(height: 16).help("\(slot.position.rawValue) · \(slot.name)")
+    }
+
+    private var insertPreview: some View {
+        let slots = appState.insertConfigs[.bus(busID)] ?? []
+        let pre = slots.filter { $0.position == .pre }
+        let post = slots.filter { $0.position == .post }
+        let hasPost = !post.isEmpty
+        // 3 × 16 pt rows + 2 × 2 pt gaps; POST consumes the 12 pt fader boundary reserve.
+        return VStack(spacing: 2) {
+            VStack(spacing: 2) {
+                DualActionButton(title: "INSERT · \(slots.count)", isActive: appState.insertChainIsEnabled(.bus(busID)),
+                                 onLeftClick: { appState.toggleInsertChain(.bus(busID)) }, onRightClick: { showInserts = true }, fontSize: 8)
+                    .frame(height: 20)
+                ScrollView(.vertical, showsIndicators: slots.count > 3) {
+                    VStack(spacing: 2) {
+                        if slots.isEmpty { Text("—").font(VMTheme.fontSmall).foregroundStyle(.secondary).frame(height: 16) }
+                        ForEach(pre, id: \.id) { insertRow($0) }
+                        if hasPost {
+                            // Include intermediate stages so a moved EQ/LIMIT does not imply a false signal order.
+                            ForEach(appState.busProcessingOrder.filter { stage in
+                                guard let index = appState.busProcessingOrder.firstIndex(of: stage),
+                                      let start = appState.busProcessingOrder.firstIndex(of: .preInserts),
+                                      let end = appState.busProcessingOrder.firstIndex(of: .postInserts) else { return false }
+                                return index > start && index < end
+                            }) { stage in
+                                if stage == .fader { faderBoundary }
+                                else { Text(stage.title).font(.system(size: 7)).foregroundStyle(VMTheme.textSecondary).frame(height: 10) }
+                            }
+                            ForEach(post, id: \.id) { insertRow($0) }
+                        }
+                    }.padding(.horizontal, 2)
+                }.frame(height: hasPost ? 64 : 52)
+            }.background(VMTheme.textAccent.opacity(0.07))
+                .overlay(RoundedRectangle(cornerRadius: 3).stroke(VMTheme.textAccent.opacity(0.22), lineWidth: 1))
+            if !hasPost { faderBoundary }
+        }.frame(height: 86, alignment: .top)
+    }
+
 }
 
 public struct MasterSectionView: View {
