@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMainMenu()
+        NotificationCenter.default.addObserver(self, selector: #selector(refreshLanguage), name: .audiomeeterLanguageChanged, object: nil)
 
         let contentView = MainView()
         let window = NSWindow(
@@ -21,7 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             defer: false
         )
         window.center()
-        window.title = "Voicemeeter Banana for Mac (ARM64)"
+        window.title = "Audiomeeter for Mac (ARM64)"
         window.minSize = NSSize(width: 1060, height: 640)
         window.contentView = MixerHostingView(rootView: contentView)
         window.isReleasedWhenClosed = false
@@ -30,12 +31,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         self.window = window
-        if !ProcessInfo.processInfo.arguments.contains("--ui-preview") && Bundle.main.bundleIdentifier != "com.antigravity.voicemeetermac.uipreview" { desktopControls = DesktopControlsCoordinator(state: AppState.shared) }
+        if !ProcessInfo.processInfo.arguments.contains("--ui-preview") && Bundle.main.bundleIdentifier != "local.audiomeeter.uipreview" { desktopControls = DesktopControlsCoordinator(state: AppState.shared) }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         desktopControls?.stop()
         Task { @MainActor in
+            await AppState.shared.recorderPlayer.finishRecording()
             await AppState.shared.snapshotPlugins()
             sender.reply(toApplicationShouldTerminate: true)
         }
@@ -47,6 +49,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppState.shared.shutdown()
     }
 
+    @objc private func refreshLanguage() { setupMainMenu() }
+
     private func setupMainMenu() {
         let mainMenu = NSMenu()
 
@@ -54,22 +58,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let appMenuItem = NSMenuItem()
         let appMenu = NSMenu()
 
-        appMenu.addItem(withTitle: "About Voicemeeter Banana", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        appMenu.addItem(withTitle: L10n.text("About Audiomeeter"), action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(NSMenuItem.separator())
 
-        let show = appMenu.addItem(withTitle: "ミキサーを表示", action: #selector(showMixer), keyEquivalent: "")
+        let show = appMenu.addItem(withTitle: L10n.text("ミキサーを表示"), action: #selector(showMixer), keyEquivalent: "")
         show.target = self
 
-        let hideItem = appMenu.addItem(withTitle: "Hide Voicemeeter Banana", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hideItem = appMenu.addItem(withTitle: L10n.text("Hide Audiomeeter"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         hideItem.keyEquivalentModifierMask = [.command]
 
-        let hideOthersItem = appMenu.addItem(withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
+        let hideOthersItem = appMenu.addItem(withTitle: L10n.text("Hide Others"), action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
         hideOthersItem.keyEquivalentModifierMask = [.command, .option]
 
-        appMenu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
+        appMenu.addItem(withTitle: L10n.text("Show All"), action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         appMenu.addItem(NSMenuItem.separator())
 
-        let quitItem = appMenu.addItem(withTitle: "Quit Voicemeeter Banana", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quitItem = appMenu.addItem(withTitle: L10n.text("Quit Audiomeeter"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quitItem.keyEquivalentModifierMask = [.command]
 
         appMenuItem.submenu = appMenu
@@ -77,15 +81,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 2. Window Menu (Minimize, Zoom, Close)
         let windowMenuItem = NSMenuItem()
-        let windowMenu = NSMenu(title: "Window")
+        let windowMenu = NSMenu(title: L10n.text("Window"))
 
-        let closeItem = windowMenu.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let closeItem = windowMenu.addItem(withTitle: L10n.text("Close Window"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         closeItem.keyEquivalentModifierMask = [.command]
 
-        let minimizeItem = windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.miniaturize(_:)), keyEquivalent: "m")
+        let minimizeItem = windowMenu.addItem(withTitle: L10n.text("Minimize"), action: #selector(NSWindow.miniaturize(_:)), keyEquivalent: "m")
         minimizeItem.keyEquivalentModifierMask = [.command]
 
-        windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        windowMenu.addItem(withTitle: L10n.text("Zoom"), action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
 
         windowMenuItem.submenu = windowMenu
         mainMenu.addItem(windowMenuItem)

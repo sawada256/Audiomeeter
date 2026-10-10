@@ -4,11 +4,11 @@ set -e
 DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$DIR"
 
-echo "Building Voicemeeter Banana (Release ARM64)..."
+echo "Building Audiomeeter (Release ARM64)..."
 "$DIR/build_plugin_host.sh"
 swift build -c release
 
-APP_NAME="Voicemeeter Banana.app"
+APP_NAME="Audiomeeter.app"
 APP_DIR="$DIR/$APP_NAME"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
@@ -20,7 +20,9 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$CONTENTS_DIR/Frameworks"
 cp "$DIR/Assets/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 cp "$DIR/.build/plugin-host/libVMPluginHost.dylib" "$CONTENTS_DIR/Frameworks/"
 
-cp "$DIR/.build/dependencies/JUCE/LICENSE.md" "$RESOURCES_DIR/JUCE-LICENSE.md"
+cp -R "$DIR/LICENSES" "$RESOURCES_DIR/LICENSES"
+cp "$DIR/THIRD_PARTY_NOTICES.md" "$RESOURCES_DIR/THIRD_PARTY_NOTICES.md"
+python3 "$DIR/Tools/collect_dependency_notices.py" "$DIR/.build/dependencies/JUCE" "$RESOURCES_DIR/LICENSES/JUCE-dependencies"
 WORKER_CONTENTS="$CONTENTS_DIR/Helpers/VMPluginWorker.app/Contents"
 mkdir -p "$WORKER_CONTENTS/MacOS"
 cp "$DIR/.build/plugin-host/VMPluginWorker" "$WORKER_CONTENTS/MacOS/VMPluginWorker"
@@ -29,17 +31,17 @@ cat << 'WORKER_EOF' > "$WORKER_CONTENTS/Info.plist"
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleExecutable</key><string>VMPluginWorker</string>
-<key>CFBundleIdentifier</key><string>com.antigravity.voicemeetermac.pluginworker</string>
-<key>CFBundleName</key><string>Voicemeeter Plugin</string>
+<key>CFBundleIdentifier</key><string>local.audiomeeter.pluginworker</string>
+<key>CFBundleName</key><string>Audiomeeter Plugin</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>1.2.0</string>
-<key>CFBundleVersion</key><string>19</string>
+<key>CFBundleShortVersionString</key><string>1.0.0</string>
+<key>CFBundleVersion</key><string>1</string>
 <key>LSUIElement</key><true/>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 WORKER_EOF
-cp "$DIR/.build/release/VoicemeeterMac" "$MACOS_DIR/VoicemeeterMac"
+cp "$DIR/.build/release/Audiomeeter" "$MACOS_DIR/Audiomeeter"
 
 cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -47,31 +49,33 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
 <plist version="1.0">
 <dict>
     <key>CFBundleDevelopmentRegion</key>
-    <string>en</string>
+    <string>ja</string>
     <key>CFBundleExecutable</key>
-    <string>VoicemeeterMac</string>
+    <string>Audiomeeter</string>
     <key>CFBundleIdentifier</key>
-    <string>com.antigravity.voicemeetermac</string>
+    <string>local.audiomeeter</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>Voicemeeter Banana</string>
+    <string>Audiomeeter</string>
     <key>CFBundleDisplayName</key>
-    <string>Voicemeeter Banana</string>
+    <string>Audiomeeter</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.2.0</string>
+    <string>1.0.0</string>
     <key>CFBundleVersion</key>
-    <string>19</string>
+    <string>1</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>CFBundleLocalizations</key>
+    <array><string>ja</string><string>en</string></array>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Voicemeeter Banana requires microphone access to route audio streams.</string>
+    <string>Audiomeeter requires microphone access to route audio streams.</string>
 </dict>
 </plist>
 EOF

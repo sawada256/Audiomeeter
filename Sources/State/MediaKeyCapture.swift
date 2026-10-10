@@ -17,7 +17,7 @@ final class MediaKeyCapture: @unchecked Sendable {
     init(action: @escaping (MixerHotkeyAction) -> Void) {
         self.action = action
         let thread = Thread { [self] in run() }
-        thread.name = "Voicemeeter volume keys"
+        thread.name = "Audiomeeter volume keys"
         thread.qualityOfService = .userInteractive
         thread.start()
     }

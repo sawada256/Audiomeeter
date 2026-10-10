@@ -115,7 +115,7 @@ public struct HardwareStripView: View {
 
     private var headerView: some View {
         VStack(spacing: 2) {
-            Text(stripID.name)
+            Text(L10n.text(stripID.name))
                 .font(VMTheme.fontTitle)
                 .foregroundColor(VMTheme.textPrimary)
 
@@ -131,7 +131,7 @@ public struct HardwareStripView: View {
                 }
             } label: {
                 HStack {
-                    Text(currentDevice?.name ?? "Select Device...")
+                    Text(currentDevice?.name ?? L10n.text("Select Device..."))
                         .font(VMTheme.fontSmall)
                         .foregroundColor(currentDevice != nil ? VMTheme.textAccent : VMTheme.textSecondary)
                         .lineLimit(1)

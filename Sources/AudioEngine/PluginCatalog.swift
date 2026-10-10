@@ -26,7 +26,7 @@ final class PluginCatalog: ObservableObject {
     private var records: [String: PluginScanRecord] = [:]
     private var scanTask: Task<Void, Never>?
     private let cacheURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("VoicemeeterMac/plugin-catalog.json")
+        .appendingPathComponent("Audiomeeter/plugin-catalog.json")
 
     private init() {
         if let data = try? Data(contentsOf: cacheURL),
@@ -40,7 +40,7 @@ final class PluginCatalog: ObservableObject {
 
     func scan(force: Bool = false) {
         guard !scanning else { return }
-        guard PluginRuntime.shared.available else { progress = "VST3ホストが利用できません。"; return }
+        guard PluginRuntime.shared.available else { progress = L10n.text("VST3ホストが利用できません。"); return }
         let executable = Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0])
         let bundledHost = Bundle.main.bundleURL.appendingPathComponent("Contents/Frameworks/libVMPluginHost.dylib")
         let host = FileManager.default.fileExists(atPath: bundledHost.path) ? bundledHost :
@@ -64,7 +64,7 @@ final class PluginCatalog: ObservableObject {
             }
             publish()
             save()
-            progress = Task.isCancelled ? "スキャンを停止しました" : "\(entries.count) エフェクト · \(failures.count) 件の読込エラー"
+            progress = Task.isCancelled ? L10n.text("スキャンを停止しました") : L10n.text("{0} エフェクト · {1} 件の読込エラー", [String(describing: entries.count), String(describing: failures.count)])
             scanning = false
             scanTask = nil
         }
@@ -121,11 +121,11 @@ final class PluginCatalog: ObservableObject {
                 Thread.sleep(forTimeInterval: 0.1)
                 if process.isRunning { kill(process.processIdentifier, SIGKILL) }
                 process.waitUntilExit()
-                return PluginScanRecord(fingerprint: fingerprint, entries: [], error: "20秒でタイムアウト（再スキャンで再試行）")
+                return PluginScanRecord(fingerprint: fingerprint, entries: [], error: L10n.text("20秒でタイムアウト（再スキャンで再試行）"))
             }
             process.waitUntilExit()
             guard process.terminationStatus == 0 else {
-                return PluginScanRecord(fingerprint: fingerprint, entries: [], error: "スキャナー終了コード \(process.terminationStatus)")
+                return PluginScanRecord(fingerprint: fingerprint, entries: [], error: L10n.text("スキャナー終了コード {0}", [String(describing: process.terminationStatus)]))
             }
             let entries = try JSONDecoder().decode([PluginCatalogEntry].self, from: Data(contentsOf: outputURL))
             return PluginScanRecord(fingerprint: fingerprint, entries: entries, error: nil)

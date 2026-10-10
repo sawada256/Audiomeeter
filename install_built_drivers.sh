@@ -5,14 +5,16 @@ if [ "$(id -u)" != 0 ]; then exec sudo /bin/bash "$0"; fi
 TASK_PRODUCTS="$TASK_ROOT/.build/drivers"
 TASK_HAL=/Library/Audio/Plug-Ins/HAL
 TASK_BACKUP="$TASK_ROOT/.build/installation-backup/$(date +%Y%m%d-%H%M%S)-HAL"
-TASK_NAMES=(Voicemeeter VoicemeeterAUX VoicemeeterB1 VoicemeeterB2)
+TASK_NAMES=(Audiomeeter AudiomeeterAUX AudiomeeterB1 AudiomeeterB2)
 for TASK_NAME in "${TASK_NAMES[@]}"; do
     test -d "$TASK_PRODUCTS/$TASK_NAME.driver"
     /usr/bin/codesign --verify --deep --strict "$TASK_PRODUCTS/$TASK_NAME.driver"
 done
-mkdir -p "$TASK_BACKUP"
+mkdir -p "$TASK_BACKUP" "$TASK_HAL"
+TASK_CHANGED=()
 rollback() {
-    for TASK_NAME in "${TASK_NAMES[@]}"; do
+    for TASK_NAME in "${TASK_CHANGED[@]}"; do
+        rm -rf "$TASK_HAL/$TASK_NAME.driver"
         if [ -d "$TASK_BACKUP/$TASK_NAME.driver" ]; then
             rm -rf "$TASK_HAL/$TASK_NAME.driver"
             /usr/bin/ditto "$TASK_BACKUP/$TASK_NAME.driver" "$TASK_HAL/$TASK_NAME.driver"
@@ -30,6 +32,7 @@ for TASK_NAME in "${TASK_NAMES[@]}"; do
     chown -R root:wheel "$TASK_HAL/.$TASK_NAME.update.driver"
 done
 for TASK_NAME in "${TASK_NAMES[@]}"; do
+    TASK_CHANGED+=("$TASK_NAME")
     rm -rf "$TASK_HAL/$TASK_NAME.driver"
     mv "$TASK_HAL/.$TASK_NAME.update.driver" "$TASK_HAL/$TASK_NAME.driver"
 done

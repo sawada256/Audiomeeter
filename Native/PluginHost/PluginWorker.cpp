@@ -35,8 +35,8 @@ class PluginWorker final : public JUCEApplication, private Timer {
     int snapshots=0;
     bool editorWasVisible=false;
 public:
-    const String getApplicationName() override { return "Voicemeeter Plugin"; }
-    const String getApplicationVersion() override { return "1.2.0"; }
+    const String getApplicationName() override { return "Audiomeeter Plugin"; }
+    const String getApplicationVersion() override { return "1.0.0"; }
     bool moreThanOneInstanceAllowed() override { return true; }
     void initialise(const String& arguments) override {
         StringArray args; args.addTokens(arguments,true); args.trim();

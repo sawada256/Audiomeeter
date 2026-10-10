@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Voicemeeter Banana Color Palette and Styling Tokens
+/// Audiomeeter Color Palette and Styling Tokens
 public enum VMTheme {
     // Console Backgrounds
     public static let consoleBg = Color(red: 0.08, green: 0.09, blue: 0.11)       // #14171c

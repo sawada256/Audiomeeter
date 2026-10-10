@@ -7,13 +7,13 @@ struct StereoPanView: View {
     private var value: Float { appState.strips[strip]?.pan ?? 0 }
     var body: some View {
         HStack(spacing: 4) {
-            Text("PAN").font(VMTheme.fontSmall)
+            Text(L10n.text("PAN")).font(VMTheme.fontSmall)
             PanTrack(value: value) { appState.setStripPan(strip: strip, pan: $0) }
             Text(StereoPanControl.label(value)).font(VMTheme.fontSmall).frame(width: 28)
                 .contentShape(Rectangle())
                 .onTapGesture(count: 2) { appState.setStripPan(strip: strip, pan: 0) }
         }.frame(height: 18).padding(.horizontal, 4)
-        .help("左右のバランス。中央付近でスナップ、ダブルクリックで中央")
+        .help(L10n.text("左右のバランス。中央付近でスナップ、ダブルクリックで中央"))
     }
 }
 
@@ -33,7 +33,7 @@ private final class PanTrackNSView: NSView {
     private var resetting = false
     override init(frame: NSRect) {
         super.init(frame: frame)
-        setAccessibilityElement(true); setAccessibilityRole(.slider); setAccessibilityLabel("PAN")
+        setAccessibilityElement(true); setAccessibilityRole(.slider); setAccessibilityLabel(L10n.text("PAN"))
         setAccessibilityMinValue(NSNumber(value: -1)); setAccessibilityMaxValue(NSNumber(value: 1))
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unsupported") }

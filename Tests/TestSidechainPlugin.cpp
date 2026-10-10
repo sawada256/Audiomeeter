@@ -4,7 +4,7 @@ class TestSide final : public juce::AudioProcessor {
     float delay[2][37]={}; int position=0;
 public:
     TestSide() : AudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::stereo(), true).withInput("Required Sidechain", juce::AudioChannelSet::stereo(), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) { setLatencySamples(37); }
-    const juce::String getName() const override { return "Voicemeeter Test Sidechain"; }
+    const juce::String getName() const override { return "Audiomeeter Test Sidechain"; }
     void prepareToPlay(double,int) override { memset(delay,0,sizeof(delay));position=0; }
     void releaseResources() override {}
     bool isBusesLayoutSupported(const BusesLayout& layout) const override { return layout.inputBuses.size()==2 && layout.inputBuses[1]==juce::AudioChannelSet::stereo() && layout.getMainInputChannelSet()==juce::AudioChannelSet::stereo() && layout.getMainOutputChannelSet()==juce::AudioChannelSet::stereo(); }

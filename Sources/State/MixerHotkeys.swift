@@ -56,11 +56,11 @@ import CoreAudio
         let settings = state.desktopControls
         var failures: [String] = [], occupied: Set<MixerShortcut> = []
         func register(_ shortcut: MixerShortcut, id: UInt32) {
-            guard occupied.insert(shortcut).inserted else { failures.append("重複キー: \(shortcut.displayName)"); return }
+            guard occupied.insert(shortcut).inserted else { failures.append(L10n.text("重複キー: {0}", [String(describing: shortcut.displayName)])); return }
             var ref: EventHotKeyRef?
             let status = RegisterEventHotKey(shortcut.keyCode, shortcut.modifiers, EventHotKeyID(signature: 0x564D484B, id: id), GetApplicationEventTarget(), 0, &ref)
             if status == noErr, let ref { registrations.append(ref) }
-            else { failures.append("登録できません: \(shortcut.displayName)（他の機能と競合）") }
+            else { failures.append(L10n.text("登録できません: {0}（他の機能と競合）", [String(describing: shortcut.displayName)])) }
         }
         if settings.overlayMode == .held { register(settings.overlayShortcut, id: 1) }
         for (index, binding) in settings.hotkeys.enumerated() {
@@ -87,11 +87,11 @@ import CoreAudio
             }
             switch mediaCapture?.status {
             case .ready: break
-            case .starting: failures.append("音量キー: 捕捉を接続中")
-            default: failures.append("音量キー: macOSが捕捉を許可していません。許可登録を確認してください。自動で再試行します。")
+            case .starting: failures.append(L10n.text("音量キー: 捕捉を接続中"))
+            default: failures.append(L10n.text("音量キー: macOSが捕捉を許可していません。許可登録を確認してください。自動で再試行します。"))
             }
         }
-        let status = failures.isEmpty ? (state.desktopControls.mediaKeysEnabled ? "ホットキー・音量キー捕捉: 有効" : "ホットキー: 有効／音量キー置換: OFF") : failures.joined(separator: "\n")
+        let status = failures.isEmpty ? (state.desktopControls.mediaKeysEnabled ? L10n.text("ホットキー・音量キー捕捉: 有効") : L10n.text("ホットキー: 有効／音量キー置換: OFF")) : failures.joined(separator: "\n")
         if state.desktopControlsStatus != status { state.desktopControlsStatus = status }
     }
     private func handle(_ id: UInt32, down: Bool) {
@@ -105,14 +105,14 @@ import CoreAudio
     }
 }
 
-/// Keep only Voicemeeter's public playback devices at unity, including OS mute.
+/// Keep only Audiomeeter's public playback devices at unity, including OS mute.
 /// Property listeners avoid polling every audio callback and never touch physical outputs.
 @MainActor final class VirtualOutputVolumeGuard {
     private var listeners: [(AudioObjectID, AudioObjectPropertyAddress, AudioObjectPropertyListenerBlock)] = []
     private var ids: [AudioObjectID] = []
     private var timer: Timer?
     func configure(enabled: Bool, devices: [AudioDeviceInfo]) {
-        let next = enabled ? devices.filter { ["Voicemeeter_UID", "VoicemeeterAUX_UID"].contains($0.uid) }.map(\.id) : []
+        let next = enabled ? devices.filter { ["Audiomeeter_UID", "AudiomeeterAUX_UID"].contains($0.uid) }.map(\.id) : []
         guard next != ids else { return }
         stop(); ids = next
         for id in next {

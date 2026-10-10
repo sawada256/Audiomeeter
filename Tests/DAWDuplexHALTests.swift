@@ -3,7 +3,7 @@ import CoreAudio
 import VMNative
 @main struct DAWDuplexHALTests {
     static func main() {
-        let deviceUID = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "Voicemeeter_UID"
+        let deviceUID = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "Audiomeeter_UID"
         var address=AudioObjectPropertyAddress(mSelector:kAudioHardwarePropertyDevices,mScope:kAudioObjectPropertyScopeGlobal,mElement:0)
         var size:UInt32=0
         precondition(AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject),&address,0,nil,&size)==noErr)

@@ -95,10 +95,10 @@ public struct EQWindowView: View {
                 Text("EQ PRESETS").font(VMTheme.fontSmallBold)
                 ForEach(0..<3) { slot in
                     HStack(spacing: 4) {
-                        Button("\(slot + 1) 呼出") { appState.loadEQPreset(bus: bus, slot: slot) }
+                        Button(L10n.text("{0} 呼出", [String(describing: slot + 1)])) { appState.loadEQPreset(bus: bus, slot: slot) }
                             .disabled(!hasPreset(slot))
-                        Button("保存") { appState.saveEQPreset(bus: bus, slot: slot) }
-                            .help("現在のEQをプリセット\(slot + 1)に保存・上書き")
+                        Button(L10n.text("保存")) { appState.saveEQPreset(bus: bus, slot: slot) }
+                            .help(L10n.text("現在のEQをプリセット{0}に保存・上書き", [String(describing: slot + 1)]))
                     }
                 }
                 Spacer()
@@ -314,7 +314,7 @@ public struct EQWindowView: View {
                 set: { newType in appState.setBusEQBand(bus: bus, bandIndex: index, type: newType) }
             )) {
                 ForEach(FilterType.allCases) { type in
-                    Text(type.rawValue).tag(type)
+                    Text(L10n.text(type.rawValue)).tag(type)
                 }
             }
             .labelsHidden()

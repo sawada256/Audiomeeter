@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Channel Strip for Virtual Inputs (Voicemeeter VAIO & AUX)
+/// Channel Strip for Virtual Inputs (Audiomeeter VAIO & AUX)
 public struct VirtualStripView: View {
     public let stripID: StripID
     @State private var showAppTrims = false
@@ -39,18 +39,18 @@ public struct VirtualStripView: View {
                 VStack(spacing: 4) {
                     Menu {
                         ForEach(0..<3) { slot in
-                            Button("プリセット\(slot + 1)を呼出") { appState.loadStripEQPreset(strip: stripID, slot: slot) }
+                            Button(L10n.text("プリセット{0}を呼出", [String(describing: slot + 1)])) { appState.loadStripEQPreset(strip: stripID, slot: slot) }
                                 .disabled(!hasEQPreset(slot))
-                            Button("現在のEQをプリセット\(slot + 1)に保存") { appState.saveStripEQPreset(strip: stripID, slot: slot) }
+                            Button(L10n.text("現在のEQをプリセット{0}に保存", [String(describing: slot + 1)])) { appState.saveStripEQPreset(strip: stripID, slot: slot) }
                             if slot < 2 { Divider() }
                         }
-                    } label: { Text("EQUALIZER").font(VMTheme.fontLabel).foregroundColor(VMTheme.textSecondary) }
+                    } label: { Text(L10n.text("EQUALIZER")).font(VMTheme.fontLabel).foregroundColor(VMTheme.textSecondary) }
                     .menuStyle(.borderlessButton).fixedSize()
-                    .help("3つのEQプリセットを保存・呼出")
+                    .help(L10n.text("3つのEQプリセットを保存・呼出"))
 
                     HStack(spacing: 4) {
                         RotaryKnobView(
-                            title: "BASS",
+                            title: L10n.text("BASS"),
                             value: Binding(
                                 get: { settings.eq.lowGainDB },
                                 set: { appState.setStripEQ(strip: stripID, low: $0) }
@@ -61,7 +61,7 @@ public struct VirtualStripView: View {
                             isDB: true
                         )
                         RotaryKnobView(
-                            title: "MED",
+                            title: L10n.text("MED"),
                             value: Binding(
                                 get: { settings.eq.midGainDB },
                                 set: { appState.setStripEQ(strip: stripID, mid: $0) }
@@ -72,7 +72,7 @@ public struct VirtualStripView: View {
                             isDB: true
                         )
                         RotaryKnobView(
-                            title: "TREBLE",
+                            title: L10n.text("TREBLE"),
                             value: Binding(
                                 get: { settings.eq.highGainDB },
                                 set: { appState.setStripEQ(strip: stripID, high: $0) }
@@ -93,7 +93,7 @@ public struct VirtualStripView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "music.mic")
                             .font(.system(size: 9))
-                        Text("KARAOKE (VOCAL CANCEL)")
+                        Text(L10n.text("KARAOKE (VOCAL CANCEL)"))
                             .font(.system(size: 8, weight: .bold))
                     }
                     .foregroundColor(settings.isKaraoke ? Color.white : VMTheme.textSecondary)
@@ -117,7 +117,7 @@ public struct VirtualStripView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(VMTheme.textAccent)
-                .help("この仮想デバイスに出力中のアプリとトリム")
+                .help(L10n.text("この仮想デバイスに出力中のアプリとトリム"))
                 .sheet(isPresented: $showAppTrims) { AppTrimView(appState: appState, strip: stripID) }
                 DualActionButton(title: "INSERTS • \((appState.insertConfigs[.strip(stripID)] ?? []).count) FX", isActive: appState.insertChainIsEnabled(.strip(stripID)), onLeftClick: { appState.toggleInsertChain(.strip(stripID)) }, onRightClick: { showInserts = true }, fontSize: 9)
                     .frame(height: 20)
@@ -190,7 +190,7 @@ public struct VirtualStripView: View {
                 }
             } label: {
                 HStack {
-                    Text(currentDevice?.name ?? "Select Virtual In...")
+                    Text(currentDevice?.name ?? L10n.text("Select Virtual In..."))
                         .font(VMTheme.fontSmall)
                         .foregroundColor(currentDevice != nil ? VMTheme.textGold : VMTheme.textSecondary)
                         .lineLimit(1)

@@ -3,14 +3,14 @@ import Foundation
 @main struct SidechainRoutingTests {
     static let root = FileManager.default.currentDirectoryPath + "/.build/plugin-host/"
     static func slot(sidechain: BusID? = nil, position: InsertPosition = .post, gain: Bool = false, frames: UInt32 = 512) throws -> HostedInsert {
-        var config = InsertConfig(path: root + (gain ? "VMTestGain_artefacts/Release/VST3/Voicemeeter Test Gain.vst3" : "VMTestSide_artefacts/Release/VST3/Voicemeeter Test Sidechain.vst3"), name: "Test", position: position)
+        var config = InsertConfig(path: root + (gain ? "VMTestGain_artefacts/Release/VST3/Audiomeeter Test Gain.vst3" : "VMTestSide_artefacts/Release/VST3/Audiomeeter Test Sidechain.vst3"), name: "Test", position: position)
         config.sidechainBus = sidechain
         let insert = try HostedInsert(config: config, rate: 48000, block: frames)
         for _ in 0..<500 { insert.refresh(); if insert.status.isEmpty { return insert }; usleep(20000) }
         preconditionFailure(insert.status)
     }
-    static func engine(frames: UInt32 = 512) throws -> VoicemeeterEngine {
-        let engine = VoicemeeterEngine()
+    static func engine(frames: UInt32 = 512) throws -> AudiomeeterEngine {
+        let engine = AudiomeeterEngine()
         try engine.configureClock(rate: 48000, frames: frames)
         engine.latencyCompensationEnabled = false
         engine.outputBusAlignmentEnabled = false
@@ -18,7 +18,7 @@ import Foundation
         return engine
     }
     // Prime asynchronous workers, then record a stereo impulse through the actual mixer.
-    static func impulses(_ engine: VoicemeeterEngine, main: StripID = .virtualVAIO, source: StripID = .hardware1) -> [BusID: [Float]] {
+    static func impulses(_ engine: AudiomeeterEngine, main: StripID = .virtualVAIO, source: StripID = .hardware1) -> [BusID: [Float]] {
         let frames = Int(engine.bufferSize), zeros = [Float](repeating: 0, count: frames * 2)
         for _ in 0..<12 { engine.feedOffline(main, zeros); engine.feedOffline(source, zeros); _ = engine.renderOffline(); usleep(12000) }
         var result = Dictionary(uniqueKeysWithValues: BusID.allCases.map { ($0, [Float]()) })

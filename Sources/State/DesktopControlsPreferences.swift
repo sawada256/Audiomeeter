@@ -11,7 +11,7 @@ struct MixerShortcut: Codable, Equatable, Hashable {
 }
 enum MixerHotkeyAction: String, Codable, CaseIterable {
     case increase, decrease, mute
-    var name: String { switch self { case .increase: return "上げる"; case .decrease: return "下げる"; case .mute: return "ミュート切替" } }
+    var name: String { switch self { case .increase: return L10n.text("上げる"); case .decrease: return L10n.text("下げる"); case .mute: return L10n.text("ミュート切替") } }
 }
 enum MixerMediaKey {
     static func shouldConsume(eventType: UInt32, subtype: Int16, data: Int) -> Bool {
@@ -33,15 +33,15 @@ struct MixerHotkeyBinding: Codable, Equatable, Identifiable {
 }
 enum MiniMixerMode: String, Codable, CaseIterable {
     case off, always, held
-    var name: String { switch self { case .off: return "非表示"; case .always: return "常時表示"; case .held: return "キーを押している間" } }
+    var name: String { switch self { case .off: return L10n.text("非表示"); case .always: return L10n.text("常時表示"); case .held: return L10n.text("キーを押している間") } }
 }
 enum MiniMixerCorner: String, Codable, CaseIterable {
     case topRight, topLeft, bottomRight, bottomLeft
-    var name: String { switch self { case .topRight: return "右上"; case .topLeft: return "左上"; case .bottomRight: return "右下"; case .bottomLeft: return "左下" } }
+    var name: String { switch self { case .topRight: return L10n.text("右上"); case .topLeft: return L10n.text("左上"); case .bottomRight: return L10n.text("右下"); case .bottomLeft: return L10n.text("左下") } }
 }
 enum MiniMixerAppSource: String, Codable, CaseIterable {
     case automatic, vaio, aux, both
-    var name: String { switch self { case .automatic: return "OSの出力先に追従"; case .vaio: return "VAIO"; case .aux: return "AUX"; case .both: return "VAIO と AUX" } }
+    var name: String { switch self { case .automatic: return L10n.text("OSの出力先に追従"); case .vaio: return "VAIO"; case .aux: return "AUX"; case .both: return L10n.text("VAIO と AUX") } }
 }
 struct MiniMixerChannel: Codable, Equatable {
     var fader = false

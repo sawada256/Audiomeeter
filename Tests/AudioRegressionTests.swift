@@ -79,6 +79,9 @@ struct AudioRegressionTests {
         precondition(a[0] == -0.3 && a[1] == 0 && b[0] == 0)
         _ = output.withUnsafeMutableBufferPointer { StereoAudioBufferIO.read(list.unsafeMutablePointer, into: $0.baseAddress!, capacity: 4, leftChannel: 99, rightChannel: 0) }
         precondition(output[0] == 0 && output[1] == -0.3)
+        output = [Float](repeating: 9, count: 8)
+        let silentFrames = output.withUnsafeMutableBufferPointer { StereoAudioBufferIO.read(list.unsafeMutablePointer, into: $0.baseAddress!, capacity: 4, leftChannel: 99, rightChannel: 98) }
+        precondition(silentFrames == 4 && output.allSatisfy { $0 == 0 }, "Missing mapped inputs must produce silence without falling back to channels 1/2")
         print("  Grouped stereo streams, channel offsets, and silence tails")
     }
 
@@ -151,13 +154,18 @@ struct AudioRegressionTests {
     static func testRecordingDrain() throws {
         let recorder = AudioRecorderPlayer()
         recorder.recordingFormat = .wavFloat32
-        guard let url = recorder.startRecording(sampleRate: 48000) else { fatalError("Cannot create recording") }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        guard let url = recorder.startRecording(sampleRate: 48000, directory: directory) else { fatalError("Cannot create recording") }
         let samples = [Float](repeating: 0.125, count: 512)
         for _ in 0..<100 { samples.withUnsafeBufferPointer { recorder.pushRecordingFrames(buffer: $0.baseAddress!, frames: 256) } }
         recorder.stopRecording()
         let file = try AVAudioFile(forReading: url)
         precondition(file.length == 25_600, "Stop must drain all queued frames before closing file")
-        try FileManager.default.removeItem(at: url)
+        guard let secondURL = recorder.startRecording(sampleRate: 48000, directory: directory) else { fatalError("Cannot restart recording") }
+        recorder.stopRecording()
+        precondition(url != secondURL, "Recording names must not collide on rapid restart")
+        precondition(try! AVAudioFile(forReading: url).length == 25_600, "Restart must preserve the first recording")
         print("  Recording: full 25,600-frame drain before file disposal")
     }
 
@@ -165,12 +173,12 @@ struct AudioRegressionTests {
         let root = CommandLine.arguments[2]
         precondition(vm_host_load(root + "/libVMPluginHost.dylib") != 0)
         var error = [CChar](repeating: 0, count: 1024)
-        let path = root + "/VMTestGain_artefacts/Release/VST3/Voicemeeter Test Gain.vst3"
+        let path = root + "/VMTestGain_artefacts/Release/VST3/Audiomeeter Test Gain.vst3"
         let scanned = String(cString: vm_plugin_scan(path))
         let data = Data(scanned.utf8)
         let entries = try! JSONSerialization.jsonObject(with: data) as! [[String: Any]]
         precondition(entries.count == 1)
-        precondition(entries[0]["name"] as? String == "Voicemeeter Test Gain")
+        precondition(entries[0]["name"] as? String == "Audiomeeter Test Gain")
         let identifier = entries[0]["identifier"] as! String
         precondition(vm_plugin_create_named(path, "invalid-id", 48000, 256, &error, 1024) == nil)
         guard let plugin = vm_plugin_create_named(path, identifier, 48000, 256, &error, 1024) else { fatalError(String(cString: error)) }

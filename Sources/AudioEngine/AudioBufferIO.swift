@@ -31,7 +31,11 @@ enum StereoAudioBufferIO {
         let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: data))
         let left = leftChannel.map { channel($0, in: buffers) } ?? (channel(max(0, channelOffset), in: buffers) ?? channel(0, in: buffers))
         let right = rightChannel.map { channel($0, in: buffers) } ?? (channel(max(0, channelOffset) + 1, in: buffers) ?? channel(1, in: buffers) ?? left)
-        guard let available = left ?? right else { return 0 }
+        guard let available = left ?? right else {
+            let frames = min(max(0, capacity), channel(0, in: buffers)?.2 ?? 0)
+            stereo.initialize(repeating: 0, count: frames * 2)
+            return frames
+        }
         let frames = min(max(0, capacity), left?.2 ?? available.2, right?.2 ?? available.2)
         for frame in 0..<frames {
             stereo[frame * 2] = left.map { $0.0[frame * $0.1] } ?? 0

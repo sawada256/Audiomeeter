@@ -4,9 +4,9 @@ import AudioToolbox
 import Accelerate
 import VMNative
 
-/// Voicemeeter Banana Master Audio Engine coordinating the 5x5 routing matrix and DSP
-public final class VoicemeeterEngine {
-    public static let shared = VoicemeeterEngine()
+/// Audiomeeter Master Audio Engine coordinating the 5x5 routing matrix and DSP
+public final class AudiomeeterEngine {
+    public static let shared = AudiomeeterEngine()
 
     public private(set) var engineSampleRate: Double = 48000.0
     public private(set) var bufferSize: UInt32 = 256
@@ -57,7 +57,7 @@ public final class VoicemeeterEngine {
     private var feedbackBusTaps: [BusID: UnsafeMutablePointer<Float>] = [:]
     private var currentPans: [StripID: Float] = [:]
     private func internalBus(_ uid: String?) -> BusID? {
-        switch uid { case "VoicemeeterB1_UID": return .B1; case "VoicemeeterB2_UID": return .B2; default: return nil }
+        switch uid { case "AudiomeeterB1_UID": return .B1; case "AudiomeeterB2_UID": return .B2; default: return nil }
     }
     private var stripTaps: [StripID: UnsafeMutablePointer<Float>] = [:]
     private var stripHistories: [StripID: StereoSampleHistory] = [:]
@@ -166,7 +166,7 @@ public final class VoicemeeterEngine {
 
     // Fallback timer when Master A1 is unassigned
     private var fallbackTimer: DispatchSourceTimer?
-    private let fallbackQueue = DispatchQueue(label: "com.voicemeeter.fallbackTimer", qos: .userInteractive)
+    private let fallbackQueue = DispatchQueue(label: "com.audiomeeter.fallbackTimer", qos: .userInteractive)
 
     // Mixing Scratch Memory
     private let maxFrameCapacity: Int = 4096

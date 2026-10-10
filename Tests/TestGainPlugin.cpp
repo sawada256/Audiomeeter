@@ -4,7 +4,7 @@ public:
     TestGain() : AudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::stereo(), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
         addParameter(gain = new juce::AudioParameterFloat("gain", "Gain", 0.0f, 1.0f, 0.5f));
     }
-    const juce::String getName() const override { return "Voicemeeter Test Gain"; }
+    const juce::String getName() const override { return "Audiomeeter Test Gain"; }
     void prepareToPlay(double, int) override {}
     void releaseResources() override {}
     void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override { buffer.applyGain(*gain); }

@@ -38,6 +38,9 @@ public enum RecordingSource: Int, CaseIterable, Identifiable, Codable {
 public final class AudioRecorderPlayer: ObservableObject {
     // MARK: - Published State for UI
     @Published public var isRecording: Bool = false
+    @Published public private(set) var isFinalizingRecording = false
+    @Published public private(set) var recordingError: String?
+    private let recordingErrorCounter = vm_counter_create()!
     @Published public var isPlaying: Bool = false { didSet { vm_counter_store(playCounter, isPlaying ? 1 : 0) } }
     @Published public var isPaused: Bool = false
     @Published public var isLooping: Bool = false { didSet { vm_counter_store(loopCounter, isLooping ? 1 : 0) } }
@@ -93,6 +96,7 @@ public final class AudioRecorderPlayer: ObservableObject {
         stopRecording()
         stopPlayback()
         renderedPlayback.deallocate()
+        vm_counter_destroy(recordingErrorCounter)
         vm_counter_destroy(workerCounter)
         vm_counter_destroy(playCounter)
         vm_counter_destroy(loopCounter)
@@ -150,13 +154,15 @@ public final class AudioRecorderPlayer: ObservableObject {
 
     // MARK: - Recorder Controls
 
-    public func startRecording(sampleRate: Double = 48000.0) -> URL? {
-        guard !isRecording else { return nil }
+    public func startRecording(sampleRate: Double = 48000.0, directory: URL? = nil) -> URL? {
+        guard !isRecording, !isFinalizingRecording else { return nil }
+        recordingError = nil
+        vm_counter_store(recordingErrorCounter, 0)
 
         self.recordingSampleRate = sampleRate
         let fileManager = FileManager.default
         let musicDir = fileManager.urls(for: .musicDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        let recordingsDir = musicDir.appendingPathComponent("VoicemeeterRecordings", isDirectory: true)
+        let recordingsDir = directory ?? musicDir.appendingPathComponent("AudiomeeterRecordings", isDirectory: true)
 
         try? fileManager.createDirectory(at: recordingsDir, withIntermediateDirectories: true)
 
@@ -164,7 +170,7 @@ public final class AudioRecorderPlayer: ObservableObject {
         formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
         let dateString = formatter.string(from: Date())
         let ext = recordingFormat.fileExtension
-        let fileURL = recordingsDir.appendingPathComponent("VM_REC_\(dateString).\(ext)")
+        let fileURL = recordingsDir.appendingPathComponent("AM_REC_\(dateString)_\(UUID().uuidString).\(ext)")
 
         // Setup ExtAudioFile
         var clientFormat = AudioStreamBasicDescription(
@@ -260,7 +266,7 @@ public final class AudioRecorderPlayer: ObservableObject {
         let thread = Thread { [weak self] in
             self?.recordingWorkerLoop()
         }
-        thread.name = "VoicemeeterRecordingWorker"
+        thread.name = "AudiomeeterRecordingWorker"
         thread.qualityOfService = .userInitiated
         self.recordingThread = thread
         thread.start()
@@ -282,6 +288,43 @@ public final class AudioRecorderPlayer: ObservableObject {
         }
         self.recordingThread = nil
         self.recordingStartTime = nil
+    }
+
+    private func requestRecordingStop() {
+        os_unfair_lock_lock(&recordingLock)
+        isRecordingWorkerRunning = false
+        os_unfair_lock_unlock(&recordingLock)
+    }
+
+    /// Drain and close the file off the UI thread. A new recording cannot start until done.
+    @MainActor public func finishRecording() async {
+        if isFinalizingRecording {
+            while isFinalizingRecording { try? await Task.sleep(nanoseconds: 10_000_000) }
+            return
+        }
+        guard isRecording else { return }
+        isFinalizingRecording = true
+        isRecording = false
+        requestRecordingStop()
+        let fileAddress = extAudioFile.map { UInt(bitPattern: $0) }
+        let semaphore = recordingFinished
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                semaphore.wait()
+                if let fileAddress, let file = ExtAudioFileRef(bitPattern: fileAddress) { ExtAudioFileDispose(file) }
+                continuation.resume()
+            }
+        }
+        extAudioFile = nil
+        recordingThread = nil
+        recordingStartTime = nil
+        publishRecordingError()
+        isFinalizingRecording = false
+    }
+
+    private func publishRecordingError() {
+        let status = OSStatus(truncatingIfNeeded: vm_counter_load(recordingErrorCounter))
+        if status != noErr { recordingError = L10n.text("録音の書き込みに失敗しました (OSStatus {0})。", [String(status)]) }
     }
 
     private func recordingWorkerLoop() {
@@ -318,9 +361,14 @@ public final class AudioRecorderPlayer: ObservableObject {
                             mData: rawBytes.baseAddress
                         )
                     )
-                    ExtAudioFileWrite(audioFile, frames, &bufferList)
+                    let status = ExtAudioFileWrite(audioFile, frames, &bufferList)
+                    if status != noErr {
+                        vm_counter_store(recordingErrorCounter, UInt64(bitPattern: Int64(status)))
+                        isRecordingWorkerRunning = false
+                    }
                 }
             }
+            if vm_counter_load(recordingErrorCounter) != 0 { break }
         }
     }
 
@@ -405,6 +453,10 @@ public final class AudioRecorderPlayer: ObservableObject {
     }
 
     public func updatePlaybackTime() {
+        publishRecordingError()
+        if isRecording, vm_counter_load(recordingErrorCounter) != 0 {
+            Task { @MainActor in await self.finishRecording() }
+        }
         if isPlaying && totalDuration > 0 {
             os_unfair_lock_lock(&playbackLock)
             if playbackEnded { isPlaying = false; playbackEnded = false }

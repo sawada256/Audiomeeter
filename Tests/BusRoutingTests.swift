@@ -7,19 +7,19 @@ import Foundation
         precondition(StereoPanControl.label(-0.000001) == "C")
         precondition(StereoPanControl.label(-0.76) == "L76")
         precondition(StereoPanControl.normalized(5) == 1)
-        var a = StripSettings(); a.deviceUID = "VoicemeeterB1_UID"; a.routing = RoutingMatrix(b1: true)
+        var a = StripSettings(); a.deviceUID = "AudiomeeterB1_UID"; a.routing = RoutingMatrix(b1: true)
         precondition(InternalBusRouting.hasCycle([.hardware1:a]))
         a.routing = RoutingMatrix(b2:true)
-        var b = StripSettings(); b.deviceUID = "VoicemeeterB2_UID"; b.routing = RoutingMatrix(b1:true)
+        var b = StripSettings(); b.deviceUID = "AudiomeeterB2_UID"; b.routing = RoutingMatrix(b1:true)
         precondition(InternalBusRouting.hasCycle([.hardware1:a,.hardware2:b]))
         b.routing = RoutingMatrix(a1:true)
         precondition(!InternalBusRouting.hasCycle([.hardware1:a,.hardware2:b]))
         let returnBus: BusID = CommandLine.arguments.contains("--b2") ? .B2 : .B1
-        let engine = VoicemeeterEngine()
+        let engine = AudiomeeterEngine()
         try engine.configureClock(rate:48000,frames:512)
         for strip in StripID.allCases { engine.updateStripSettings(strip:strip) { $0.routing = RoutingMatrix(); $0.dynamics = DynamicsConfig() } }
         engine.updateStripSettings(strip:.virtualVAIO) { $0.routing = RoutingMatrix(); $0.routing[returnBus] = true; $0.pan = 1 }
-        engine.updateStripSettings(strip:.hardware1) { $0.deviceUID = returnBus == .B1 ? "VoicemeeterB1_UID" : "VoicemeeterB2_UID"; $0.routing = RoutingMatrix(a1:true) }
+        engine.updateStripSettings(strip:.hardware1) { $0.deviceUID = returnBus == .B1 ? "AudiomeeterB1_UID" : "AudiomeeterB2_UID"; $0.routing = RoutingMatrix(a1:true) }
         let stereo = (0..<1024).map { $0 % 2 == 0 ? Float(0.1) : Float(0.2) }
         var previous = [Float](repeating:0,count:1024)
         for _ in 0..<8 {
@@ -29,7 +29,7 @@ import Foundation
             previous = buses[returnBus]!
         }
         precondition(abs(previous[0])<0.00001 && abs(previous[1]-0.2)<0.00001,"Full right pan must retain right and silence left")
-        var config = InsertConfig(path:FileManager.default.currentDirectoryPath+"/.build/plugin-host/VMTestSide_artefacts/Release/VST3/Voicemeeter Test Sidechain.vst3",name:"Side",position:.post)
+        var config = InsertConfig(path:FileManager.default.currentDirectoryPath+"/.build/plugin-host/VMTestSide_artefacts/Release/VST3/Audiomeeter Test Sidechain.vst3",name:"Side",position:.post)
         config.sidechainBus = returnBus
         let slot = try HostedInsert(config:config,rate:48000,block:512)
         for _ in 0..<500 { slot.refresh(); if slot.status.isEmpty { break }; usleep(20000) }

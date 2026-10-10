@@ -53,8 +53,8 @@ public enum StripID: Int, CaseIterable, Identifiable, Codable {
         case .hardware1: return "HARDWARE INPUT 1"
         case .hardware2: return "HARDWARE INPUT 2"
         case .hardware3: return "HARDWARE INPUT 3"
-        case .virtualVAIO: return "VOICEMEETER VAIO"
-        case .virtualAUX: return "VOICEMEETER AUX"
+        case .virtualVAIO: return "AUDIOMEETER VAIO"
+        case .virtualAUX: return "AUDIOMEETER AUX"
         }
     }
 
@@ -344,7 +344,7 @@ public struct MeterLevel {
 /// Reject audible feedback cycles between internal return buses.
 public enum InternalBusRouting {
     public static func source(_ uid: String?) -> BusID? {
-        switch uid { case "VoicemeeterB1_UID": return .B1; case "VoicemeeterB2_UID": return .B2; default: return nil }
+        switch uid { case "AudiomeeterB1_UID": return .B1; case "AudiomeeterB2_UID": return .B2; default: return nil }
     }
     public static func hasCycle(_ strips: [StripID: StripSettings]) -> Bool {
         func reaches(_ current: BusID, _ target: BusID, _ visited: Set<BusID>) -> Bool {

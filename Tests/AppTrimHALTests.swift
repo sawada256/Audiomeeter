@@ -17,7 +17,7 @@ struct AppTrimHALTests {
             var n = UInt32(MemoryLayout.size(ofValue: uid))
             guard AudioObjectGetPropertyData(id, &a, 0, nil, &n, &uid) == noErr, let uid else { continue }
             let text = uid.takeRetainedValue() as String
-            guard ["Voicemeeter_UID", "VoicemeeterAUX_UID"].contains(text) else { continue }
+            guard ["Audiomeeter_UID", "AudiomeeterAUX_UID"].contains(text) else { continue }
             _ = try AppTrimTransport.read(id)
             let outputBytes = vm_counter_create()!
             defer { vm_counter_destroy(outputBytes) }
@@ -63,7 +63,7 @@ struct AppTrimHALTests {
             precondition(after.contains { $0.pid == pid && abs($0.gain - 0.25) < 0.001 })
             precondition(AppTrimTransport.set(id, pid: pid, gain: 1) == noErr)
             print("HAL boundary passed: \(text), active output PID, CFData list, trim set/readback/reset")
-            if CommandLine.arguments.contains("--hold") && text == "VoicemeeterAUX_UID" {
+            if CommandLine.arguments.contains("--hold") && text == "AudiomeeterAUX_UID" {
                 print("Holding a near-silent AUX client for UI verification"); fflush(stdout)
                 Thread.sleep(forTimeInterval: 30)
             }

@@ -4,14 +4,14 @@ import Foundation
         let virtual = CommandLine.arguments.contains("--virtual")
         let first: StripID = virtual ? .virtualVAIO : .hardware1
         let second: StripID = virtual ? .virtualAUX : .hardware2
-        let engine=VoicemeeterEngine()
+        let engine=AudiomeeterEngine()
         try engine.configureClock(rate:48000,frames:512)
         for strip in StripID.allCases {
             engine.updateStripSettings(strip:strip) { $0.routing=RoutingMatrix(a1: strip == first || strip == second,b1:strip == first || strip == second) }
         }
         let root=FileManager.default.currentDirectoryPath+"/.build/plugin-host/"
-        let input=try HostedInsert(config:InsertConfig(path:root+"VMTestGain_artefacts/Release/VST3/Voicemeeter Test Gain.vst3",name:"Gain",position:.pre),rate:48000,block:512)
-        var config=InsertConfig(path:root+"VMTestSide_artefacts/Release/VST3/Voicemeeter Test Sidechain.vst3",name:"Side",position:.post)
+        let input=try HostedInsert(config:InsertConfig(path:root+"VMTestGain_artefacts/Release/VST3/Audiomeeter Test Gain.vst3",name:"Gain",position:.pre),rate:48000,block:512)
+        var config=InsertConfig(path:root+"VMTestSide_artefacts/Release/VST3/Audiomeeter Test Sidechain.vst3",name:"Side",position:.post)
         config.sidechain = second
         let output=try HostedInsert(config:config,rate:48000,block:512)
         engine.inserts[.strip(first)]=[input];engine.inserts[.bus(.A1)]=[output]

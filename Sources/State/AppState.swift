@@ -5,7 +5,7 @@ import Combine
 import VMNative
 import ServiceManagement
 
-/// Observable application state bridging UI and real-time VoicemeeterEngine
+/// Observable application state bridging UI and real-time AudiomeeterEngine
 @MainActor
 public final class AppState: ObservableObject {
     public static let shared = AppState()
@@ -83,7 +83,7 @@ public final class AppState: ObservableObject {
     @Published public var preferredRate: Double?
     public var pluginHostingAvailable: Bool { PluginRuntime.shared.available }
     private var saveWork: DispatchWorkItem?
-    private let isUIPreview = ProcessInfo.processInfo.arguments.contains("--ui-preview") || Bundle.main.bundleIdentifier == "com.antigravity.voicemeetermac.uipreview"
+    private let isUIPreview = ProcessInfo.processInfo.arguments.contains("--ui-preview") || Bundle.main.bundleIdentifier == "local.audiomeeter.uipreview"
     private var savedAppTrims: [String: Float] = [:]
 
     private var meterTimer: Timer?
@@ -125,7 +125,7 @@ public final class AppState: ObservableObject {
     public func setLaunchAtLogin(_ enabled: Bool) {
         do {
             if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-        } catch { audioError = "ログイン時の自動起動設定に失敗しました: \(error.localizedDescription)" }
+        } catch { audioError = L10n.text("ログイン時の自動起動設定に失敗しました: {0}", [String(describing: error.localizedDescription)]) }
         launchAtLogin = SMAppService.mainApp.status == .enabled
         loginApprovalRequired = SMAppService.mainApp.status == .requiresApproval
     }
@@ -145,7 +145,7 @@ public final class AppState: ObservableObject {
         }
     }
     private var appPollTimer: Timer?
-    private let engine = VoicemeeterEngine.shared
+    private let engine = AudiomeeterEngine.shared
     private let deviceManager = AudioDeviceManager.shared
 
     public init() {
@@ -179,7 +179,7 @@ public final class AppState: ObservableObject {
         // Reconnect all saved devices from previous session
         if !isUIPreview { reconnectSavedDevices() }
 
-        // Automatically assign virtual devices (BlackHole / Voicemeeter) if still unassigned
+        // Automatically assign virtual devices (BlackHole / Audiomeeter) if still unassigned
         if !isUIPreview { autoAssignVirtualDevices() }
 
         if !isUIPreview, let frames = preferredBuffer {
@@ -222,7 +222,7 @@ public final class AppState: ObservableObject {
                let device = outputDevices.first(where: { $0.uid == uid }),
                abs(device.sampleRate - engine.engineSampleRate) >= 1 {
                 recorderPlayer.stopRecording()
-                audioError = "マスターデバイスのサンプルレートが変更されたため、録音を終了しました。"
+                audioError = L10n.text("マスターデバイスのサンプルレートが変更されたため、録音を終了しました。")
             }
             if automaticDeviceRestart { engine.reconcileDevices(deviceManager.devices) }
         }
@@ -232,10 +232,10 @@ public final class AppState: ObservableObject {
 
     private func reconnectSavedDevices() {
         // Sanitize legacy incorrect bus assignments
-        if buses[.B1]?.deviceUID == "Voicemeeter_UID" {
+        if buses[.B1]?.deviceUID == "Audiomeeter_UID" {
             buses[.B1]?.deviceUID = nil
         }
-        if buses[.B2]?.deviceUID == "VoicemeeterAUX_UID" {
+        if buses[.B2]?.deviceUID == "AudiomeeterAUX_UID" {
             buses[.B2]?.deviceUID = nil
         }
 
@@ -252,29 +252,29 @@ public final class AppState: ObservableObject {
     }
 
     private func autoAssignVirtualDevices() {
-        // 1. Virtual Input 1 (VAIO): Voicemeeter VAIO, Voicemeeter, or BlackHole 2ch
-        if let vaio = inputDevices.first(where: { $0.name == "Voicemeeter" || $0.name == "Voicemeeter VAIO" || $0.name == "BlackHole 2ch" }) {
+        // 1. Virtual Input 1 (VAIO): Audiomeeter VAIO, Audiomeeter, or BlackHole 2ch
+        if let vaio = inputDevices.first(where: { $0.name == "Audiomeeter" || $0.name == "Audiomeeter VAIO" || $0.name == "BlackHole 2ch" }) {
             if strips[.virtualVAIO]?.deviceUID == nil {
                 setStripDevice(strip: .virtualVAIO, device: vaio)
             }
         }
 
-        // 2. Virtual Input 2 (AUX): Voicemeeter AUX or BlackHole 16ch
-        if let aux = inputDevices.first(where: { $0.name == "Voicemeeter AUX" || $0.name.contains("BlackHole 16ch") }) {
+        // 2. Virtual Input 2 (AUX): Audiomeeter AUX or BlackHole 16ch
+        if let aux = inputDevices.first(where: { $0.name == "Audiomeeter AUX" || $0.name.contains("BlackHole 16ch") }) {
             if strips[.virtualAUX]?.deviceUID == nil {
                 setStripDevice(strip: .virtualAUX, device: aux)
             }
         }
 
-        // 3. Virtual Output B1 (VAIO Out): Voicemeeter B1 ONLY (never assign to Voicemeeter playback!)
-        if let outB1 = outputDevices.first(where: { $0.name.contains("Voicemeeter B1") }) {
+        // 3. Virtual Output B1 (VAIO Out): Audiomeeter B1 ONLY (never assign to Audiomeeter playback!)
+        if let outB1 = outputDevices.first(where: { $0.name.contains("Audiomeeter B1") }) {
             if buses[.B1]?.deviceUID == nil {
                 setBusDevice(bus: .B1, device: outB1)
             }
         }
 
-        // 4. Virtual Output B2 (AUX Out): Voicemeeter B2 ONLY (never assign to Voicemeeter AUX playback!)
-        if let outB2 = outputDevices.first(where: { $0.name.contains("Voicemeeter B2") }) {
+        // 4. Virtual Output B2 (AUX Out): Audiomeeter B2 ONLY (never assign to Audiomeeter AUX playback!)
+        if let outB2 = outputDevices.first(where: { $0.name.contains("Audiomeeter B2") }) {
             if buses[.B2]?.deviceUID == nil {
                 setBusDevice(bus: .B2, device: outB2)
             }
@@ -283,16 +283,16 @@ public final class AppState: ObservableObject {
 
         // 5. Default Output for A1 (Master Clock)
         if buses[.A1]?.deviceUID == nil {
-            if let defOut = outputDevices.first(where: { $0.isDefaultOutput && !$0.name.contains("BlackHole") && !$0.name.contains("Voicemeeter") }) {
+            if let defOut = outputDevices.first(where: { $0.isDefaultOutput && !$0.name.contains("BlackHole") && !$0.name.contains("Audiomeeter") }) {
                 setBusDevice(bus: .A1, device: defOut)
-            } else if let nonVirtualOut = outputDevices.first(where: { !$0.name.contains("BlackHole") && !$0.name.contains("Voicemeeter") && $0.outChannels > 0 }) {
+            } else if let nonVirtualOut = outputDevices.first(where: { !$0.name.contains("BlackHole") && !$0.name.contains("Audiomeeter") && $0.outChannels > 0 }) {
                 setBusDevice(bus: .A1, device: nonVirtualOut)
             }
         }
 
         // 6. Default Hardware 1 to default input mic if unset
         if strips[.hardware1]?.deviceUID == nil {
-            if let defIn = inputDevices.first(where: { $0.isDefaultInput && !$0.name.contains("BlackHole") && !$0.name.contains("Voicemeeter") }) {
+            if let defIn = inputDevices.first(where: { $0.isDefaultInput && !$0.name.contains("BlackHole") && !$0.name.contains("Audiomeeter") }) {
                 setStripDevice(strip: .hardware1, device: defIn)
             }
         }
@@ -318,7 +318,7 @@ public final class AppState: ObservableObject {
     public func setBusDevice(bus: BusID, device: AudioDeviceInfo?) {
         guard !isStartingAudio else { return }
         if bus == .A1, recorderPlayer.isRecording, let device, abs(device.sampleRate - engine.engineSampleRate) >= 1 {
-            audioError = "録音中は異なるサンプルレートのマスターへ切り替えできません。"
+            audioError = L10n.text("録音中は異なるサンプルレートのマスターへ切り替えできません。")
             return
         }
         buses[bus]?.deviceUID = device?.uid
@@ -338,7 +338,8 @@ public final class AppState: ObservableObject {
     public func setStripChannels(strip: StripID, offset: Int) {
         guard !isStartingAudio else { return }
         strips[strip]?.channelOffset = offset
-        engine.updateStripSettings(strip: strip) { $0.channelOffset = offset }
+        strips[strip]?.leftChannel = nil; strips[strip]?.rightChannel = nil
+        engine.updateStripSettings(strip: strip) { $0.channelOffset = offset; $0.leftChannel = nil; $0.rightChannel = nil }
         let device = inputDevices.first { $0.uid == strips[strip]?.deviceUID }
         engine.assignInputDevice(strip: strip, device: device)
         reportDeviceErrors()
@@ -348,7 +349,8 @@ public final class AppState: ObservableObject {
     public func setBusChannels(bus: BusID, offset: Int) {
         guard !isStartingAudio else { return }
         buses[bus]?.channelOffset = offset
-        engine.updateBusSettings(bus: bus) { $0.channelOffset = offset }
+        buses[bus]?.leftChannel = nil; buses[bus]?.rightChannel = nil
+        engine.updateBusSettings(bus: bus) { $0.channelOffset = offset; $0.leftChannel = nil; $0.rightChannel = nil }
         let device = outputDevices.first { $0.uid == buses[bus]?.deviceUID }
         engine.assignOutputDevice(bus: bus, device: device)
         saveSettings()
@@ -401,7 +403,7 @@ public final class AppState: ObservableObject {
         s.routing[bus].toggle()
         var candidate = strips; candidate[strip] = s
         guard !InternalBusRouting.hasCycle(candidate) else {
-            audioError = "内部バスへ戻す経路が循環するため、このルーティングは有効にできません。"; return
+            audioError = L10n.text("内部バスへ戻す経路が循環するため、このルーティングは有効にできません。"); return
         }
         strips[strip] = s
         engine.updateStripSettings(strip: strip) { $0.routing[bus] = s.routing[bus] }
@@ -589,7 +591,7 @@ public final class AppState: ObservableObject {
 
     private var settingsFileURL: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("VoicemeeterMac", isDirectory: true)
+        let dir = appSupport.appendingPathComponent("Audiomeeter", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("settings.json")
     }
@@ -660,7 +662,7 @@ public final class AppState: ObservableObject {
 extension AppState {
     public func applyAudioSettings(rate: Double, frames: UInt32, meters: Double) {
         guard !isStartingAudio else { return }
-        guard !recorderPlayer.isRecording else { audioError = "録音中はオーディオ設定を変更できません。"; return }
+        guard !recorderPlayer.isRecording else { audioError = L10n.text("録音中はオーディオ設定を変更できません。"); return }
         do {
             try engine.configureClock(rate: rate, frames: frames)
             preferredRate = rate
@@ -695,7 +697,7 @@ extension AppState {
 
     public func addInsert(target: InsertTarget, position: InsertPosition, path: String, identifier: String? = nil) {
         guard !isStartingAudio else { return }
-        guard pluginHostingAvailable else { audioError = "VST3ホストが見つかりません。build_app.shでアプリをビルドしてください。"; return }
+        guard pluginHostingAvailable else { audioError = L10n.text("VST3ホストが見つかりません。build_app.shでアプリをビルドしてください。"); return }
         engine.withStoppedAudio {
             do {
                 var config = InsertConfig(path: path, name: URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent, position: position)
@@ -712,7 +714,7 @@ extension AppState {
     public func editInsert(target: InsertTarget, id: UUID) {
         guard let slot = engine.inserts[target]?.first(where: { $0.config.id == id }) else { return }
         slot.refresh()
-        if !slot.status.isEmpty && slot.status != "読込中…" { engine.withStoppedAudio { slot.retry() } }
+        if !slot.status.isEmpty && slot.status != L10n.text("読込中…") { engine.withStoppedAudio { slot.retry() } }
         slot.showEditor()
     }
 
@@ -822,7 +824,7 @@ extension AppState {
         var defaultID: AudioObjectID = 0, size = UInt32(MemoryLayout<AudioObjectID>.size)
         if AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &defaultID) == noErr {
             let uid = deviceManager.findDevice(byID: defaultID)?.uid
-            let selected: StripID? = uid == "Voicemeeter_UID" ? .virtualVAIO : uid == "VoicemeeterAUX_UID" ? .virtualAUX : nil
+            let selected: StripID? = uid == "Audiomeeter_UID" ? .virtualVAIO : uid == "AudiomeeterAUX_UID" ? .virtualAUX : nil
             if systemOutputStrip != selected { systemOutputStrip = selected }
         }
         for strip in [StripID.virtualVAIO, .virtualAUX] {
@@ -845,7 +847,7 @@ extension AppState {
                     }
                 } catch { appTrimErrors[strip] = error.localizedDescription }
             } else {
-                appTrimErrors[strip] = "VAIO／AUXにVoicemeeter専用デバイスを割り当ててください。"
+                appTrimErrors[strip] = L10n.text("VAIO／AUXにAudiomeeter専用デバイスを割り当ててください。")
             }
             appTrimSupported[strip] = supported
             items.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -858,7 +860,7 @@ extension AppState {
         guard let uid = strips[strip]?.deviceUID, let device = inputDevices.first(where: { $0.uid == uid }) else { return }
         let value = VMAppClient(pid: pid, gain: max(0, min(2, gain)))
         let status = AppTrimTransport.set(device.id, pid: pid, gain: value.gain)
-        guard status == noErr else { audioError = "アプリのトリム変更に失敗しました (OSStatus \(status))。"; return }
+        guard status == noErr else { audioError = L10n.text("アプリのトリム変更に失敗しました (OSStatus {0})。", [String(describing: status)]); return }
         if let bundle = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier {
             savedAppTrims["\(strip.rawValue):\(bundle)"] = value.gain
             saveSettings()

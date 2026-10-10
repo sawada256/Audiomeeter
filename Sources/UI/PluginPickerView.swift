@@ -20,11 +20,11 @@ struct PluginPickerView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("VST3エフェクトを選択").font(.title2.bold())
+                Text(L10n.text("VST3エフェクトを選択")).font(.title2.bold())
                 Spacer()
-                Button("閉じる") { dismiss() }
+                Button(L10n.text("閉じる")) { dismiss() }
             }
-            TextField("名称・メーカー・カテゴリで検索", text: $query)
+            TextField(L10n.text("名称・メーカー・カテゴリで検索"), text: $query)
                 .textFieldStyle(.roundedBorder)
             PluginSelectionTable(entries: filtered, selection: $selection) { entry in onSelect(entry) }
             HStack {
@@ -32,25 +32,25 @@ struct PluginPickerView: View {
                 Text(catalog.progress).font(.caption).lineLimit(1)
                 Spacer()
                 if catalog.scanning {
-                    Button("停止") { catalog.cancel() }
+                    Button(L10n.text("停止")) { catalog.cancel() }
                 } else {
-                    Button("再スキャン") { catalog.scan(force: true) }
+                    Button(L10n.text("再スキャン")) { catalog.scan(force: true) }
                 }
                 if !catalog.failures.isEmpty {
-                    Button("読込エラー (\(catalog.failures.count))") { showingErrors.toggle() }
+                    Button(L10n.text("読込エラー ({0})", [String(describing: catalog.failures.count)])) { showingErrors.toggle() }
                 }
             }
             if showingErrors {
                 ScrollView { Text(catalog.failures.joined(separator: "\n")).font(.caption).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
                     .frame(height: 100)
             }
-            Text("システム／ユーザーのVST3フォルダを検索します。楽器は一覧から除外します。ステレオ処理への対応は挿入時に確認します。")
+            Text(L10n.text("システム／ユーザーのVST3フォルダを検索します。楽器は一覧から除外します。ステレオ処理への対応は挿入時に確認します。"))
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
-                Button("ファイルから選択…", action: manualSelection)
+                Button(L10n.text("ファイルから選択…"), action: manualSelection)
                 Spacer()
-                Text("\(filtered.count) エフェクト").foregroundStyle(.secondary)
-                Button("挿入") { if let selected { onSelect(selected) } }
+                Text(L10n.text("{0} エフェクト", [String(describing: filtered.count)])).foregroundStyle(.secondary)
+                Button(L10n.text("挿入")) { if let selected { onSelect(selected) } }
                     .keyboardShortcut(.defaultAction).disabled(selected == nil)
             }
         }
@@ -110,7 +110,7 @@ private struct PluginSelectionTable: NSViewRepresentable {
         table.allowsMultipleSelection = false; table.rowHeight = 25
         table.pressureConfiguration = NSPressureConfiguration(pressureBehavior: .primaryClick)
         table.target = context.coordinator; table.doubleAction = #selector(Coordinator.doubleClick(_:))
-        for (key, name, width) in [("name", "名称", 315.0), ("manufacturer", "メーカー", 180.0), ("category", "カテゴリ", 200.0)] {
+        for (key, name, width) in [("name", L10n.text("名称"), 315.0), ("manufacturer", L10n.text("メーカー"), 180.0), ("category", L10n.text("カテゴリ"), 200.0)] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(key)); column.title = name; column.width = width
             table.addTableColumn(column)
         }

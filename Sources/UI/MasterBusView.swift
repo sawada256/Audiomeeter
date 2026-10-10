@@ -34,12 +34,12 @@ public struct SingleBusStripView: View {
             // Bus Mode selector (Normal / Mixdown / Mono)
             Menu {
                 ForEach(BusMode.allCases) { mode in
-                    Button(mode.rawValue) {
+                    Button(L10n.text(mode.rawValue)) {
                         appState.setBusMode(bus: busID, mode: mode)
                     }
                 }
             } label: {
-                Text(settings.mode.rawValue)
+                Text(L10n.text(settings.mode.rawValue))
                     .font(VMTheme.fontSmall)
                     .foregroundColor(VMTheme.textPrimary)
                     .frame(maxWidth: .infinity, minHeight: 18)
@@ -56,7 +56,7 @@ public struct SingleBusStripView: View {
             // Mute & EQ Buttons Row
             HStack(spacing: 3) {
                 // Mute Button
-                LEDButton(label: "Mute", isActive: settings.isMuted, activeColor: VMTheme.ledMuteActive) {
+                LEDButton(label: L10n.text("Mute"), isActive: settings.isMuted, activeColor: VMTheme.ledMuteActive) {
                     appState.toggleBusMute(bus: busID)
                 }
 
@@ -82,7 +82,7 @@ public struct SingleBusStripView: View {
                 .frame(height: 20)
                 .sheet(isPresented: $showInserts) { InsertRackView(appState: appState, target: .bus(busID)) }
             Toggle("LIMIT", isOn: Binding(get: { settings.isLimiterEnabled ?? true }, set: { appState.setBusLimiter(bus: busID, enabled: $0) }))
-                .toggleStyle(.button).font(VMTheme.fontSmall).help("低いレベルでは音を変えず、ピークを制限します")
+                .toggleStyle(.button).font(VMTheme.fontSmall).help(L10n.text("低いレベルでは音を変えず、ピークを制限します"))
             Text("\((appState.insertConfigs[.bus(busID)] ?? []).count) FX")
                 .font(VMTheme.fontSmall).foregroundStyle(VMTheme.textSecondary)
             Spacer()
@@ -155,7 +155,7 @@ public struct MasterSectionView: View {
     private var headerDeviceSelectors: some View {
         VStack(spacing: 4) {
             HStack {
-                Text("MASTER SECTION")
+                Text(L10n.text("MASTER SECTION"))
                     .font(VMTheme.fontTitle)
                     .foregroundColor(VMTheme.textPrimary)
                 Spacer()
@@ -227,7 +227,7 @@ struct DualActionButton: NSViewRepresentable {
         view.attributedTitle = NSAttributedString(string: title, attributes: [.font: view.font!, .foregroundColor: isActive ? NSColor.black : NSColor.systemCyan])
         view.layer?.backgroundColor = (isActive ? NSColor.systemCyan : NSColor(white: 0.12, alpha: 1)).cgColor
         view.layer?.borderColor = (isActive ? NSColor.systemCyan : NSColor(white: 0.25, alpha: 1)).cgColor
-        view.toolTip = "左クリック: ON/OFF、右クリック: 編集"
+        view.toolTip = L10n.text("左クリック: ON/OFF、右クリック: 編集")
         view.setAccessibilityLabel(title); view.setAccessibilityValue(isActive ? "ON" : "OFF")
     }
     final class ActionButton: NSButton {

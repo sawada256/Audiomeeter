@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Glowing LED Button for Voicemeeter Routing & Mute/Solo
+/// Glowing LED Button for Audiomeeter Routing & Mute/Solo
 public struct LEDButton: View {
     public let label: String
     public let isActive: Bool
@@ -96,10 +96,10 @@ public struct MuteSoloView: View {
 
     public var body: some View {
         HStack(spacing: 3) {
-            LEDButton(label: "Mute", isActive: isMuted, activeColor: VMTheme.ledMuteActive) {
+            LEDButton(label: L10n.text("Mute"), isActive: isMuted, activeColor: VMTheme.ledMuteActive) {
                 onToggleMute()
             }
-            LEDButton(label: "Solo", isActive: isSolo, activeColor: VMTheme.ledSoloActive) {
+            LEDButton(label: L10n.text("Solo"), isActive: isSolo, activeColor: VMTheme.ledSoloActive) {
                 onToggleSolo()
             }
         }

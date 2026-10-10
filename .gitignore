@@ -9,3 +9,11 @@
 .env*
 *.p12
 *.mobileprovision
+
+*.wav
+*.m4a
+*.aif
+*.aiff
+*.pem
+settings.json
+plugin-catalog.json

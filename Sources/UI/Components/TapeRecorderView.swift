@@ -14,9 +14,12 @@ public struct TapeRecorderView: View {
 
     public var body: some View {
         VStack(spacing: 6) {
+            if let error = recorderPlayer.recordingError {
+                Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+            }
             // Header Bar
             HStack {
-                Text("INTEGRATED RECORDER & PLAYER")
+                Text(L10n.text("INTEGRATED RECORDER & PLAYER"))
                     .font(VMTheme.fontSection)
                     .foregroundColor(VMTheme.textPrimary)
 
@@ -26,22 +29,22 @@ public struct TapeRecorderView: View {
                     if let url = recorderPlayer.currentRecordingURL, FileManager.default.fileExists(atPath: url.path) {
                         NSWorkspace.shared.activateFileViewerSelecting([url])
                     } else {
-                        let folder = FileManager.default.urls(for: .musicDirectory, in: .userDomainMask).first!.appendingPathComponent("VoicemeeterRecordings", isDirectory: true)
+                        let folder = FileManager.default.urls(for: .musicDirectory, in: .userDomainMask).first!.appendingPathComponent("AudiomeeterRecordings", isDirectory: true)
                         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                         NSWorkspace.shared.open(folder)
                     }
                 } label: {
-                    Label("録音をFinderで表示", systemImage: "folder.badge.magnifyingglass")
+                    Label(L10n.text("録音をFinderで表示"), systemImage: "folder.badge.magnifyingglass")
                         .font(VMTheme.fontSmallBold)
                 }.buttonStyle(.plain).foregroundColor(VMTheme.textSecondary)
-                    .help("直近の録音をFinderで選択。録音がない場合は保存フォルダを開きます")
+                    .help(L10n.text("直近の録音をFinderで選択。録音がない場合は保存フォルダを開きます"))
 
                 // File Open Button
                 Button(action: openAudioFileDialog) {
                     HStack(spacing: 4) {
                         Image(systemName: "folder.fill")
                             .font(.system(size: 10))
-                        Text("LOAD FILE")
+                        Text(L10n.text("LOAD FILE"))
                             .font(VMTheme.fontSmallBold)
                     }
                     .foregroundColor(VMTheme.textSecondary)
@@ -78,7 +81,7 @@ public struct TapeRecorderView: View {
                                 .foregroundColor(recorderPlayer.isRecording ? Color.red : (recorderPlayer.isPlaying ? VMTheme.faderCyanLine : Color.gray))
                                 .shadow(color: recorderPlayer.isRecording ? Color.red.opacity(0.8) : (recorderPlayer.isPlaying ? VMTheme.faderCyanLine.opacity(0.8) : Color.clear), radius: 4)
 
-                            Text(recorderPlayer.isRecording ? "● RECORDING" : (recorderPlayer.isPlaying ? "▶ PLAYING" : (recorderPlayer.isPaused ? "❚❚ PAUSED" : "■ STOPPED")))
+                            Text(recorderPlayer.isRecording ? L10n.text("● RECORDING") : (recorderPlayer.isPlaying ? L10n.text("▶ PLAYING") : (recorderPlayer.isPaused ? L10n.text("❚❚ PAUSED") : L10n.text("■ STOPPED"))))
                                 .font(.system(size: 8, weight: .bold))
                                 .foregroundColor(recorderPlayer.isRecording ? Color.red : (recorderPlayer.isPlaying ? VMTheme.faderCyanLine : Color.gray))
                         }
@@ -97,7 +100,7 @@ public struct TapeRecorderView: View {
                         // RECORD Button
                         Button(action: {
                             if recorderPlayer.isRecording {
-                                recorderPlayer.stopRecording()
+                                Task { @MainActor in await recorderPlayer.finishRecording() }
                             } else {
                                 _ = recorderPlayer.startRecording(sampleRate: appState.engineSampleRate)
                             }
@@ -106,7 +109,7 @@ public struct TapeRecorderView: View {
                                 Circle()
                                     .fill(recorderPlayer.isRecording ? Color.white : Color.red)
                                     .frame(width: 8, height: 8)
-                                Text("REC")
+                                Text(L10n.text("REC"))
                                     .font(.system(size: 10, weight: .bold))
                             }
                             .foregroundColor(recorderPlayer.isRecording ? Color.white : Color.red)
@@ -149,7 +152,7 @@ public struct TapeRecorderView: View {
                         // STOP Button
                         Button(action: {
                             if recorderPlayer.isRecording {
-                                recorderPlayer.stopRecording()
+                                Task { @MainActor in await recorderPlayer.finishRecording() }
                             }
                             recorderPlayer.stopPlayback()
                         }) {
@@ -188,7 +191,7 @@ public struct TapeRecorderView: View {
 
                             Picker("", selection: $recorderPlayer.recordingSource) {
                                 ForEach(RecordingSource.allCases) { src in
-                                    Text(src.displayName).tag(src)
+                                    Text(L10n.text(src.displayName)).tag(src)
                                 }
                             }
                             .labelsHidden()
@@ -198,8 +201,8 @@ public struct TapeRecorderView: View {
 
                         RecorderSourceMeter(meters: appState.meterStore, source: recorderPlayer.recordingSource)
                             .frame(width: 70, height: 12)
-                            .accessibilityLabel("録音ソース \(recorderPlayer.recordingSource.displayName) レベルメーター")
-                            .help("選択中の録音ソースの入力レベル。録音前にも確認できます")
+                            .accessibilityLabel(L10n.text("録音ソース {0} レベルメーター", [String(describing: recorderPlayer.recordingSource.displayName)]))
+                            .help(L10n.text("選択中の録音ソースの入力レベル。録音前にも確認できます"))
 
                         // Format
                         HStack(spacing: 4) {
@@ -209,7 +212,7 @@ public struct TapeRecorderView: View {
 
                             Picker("", selection: $recorderPlayer.recordingFormat) {
                                 ForEach(RecorderFormat.allCases) { fmt in
-                                    Text(fmt.rawValue).tag(fmt)
+                                    Text(L10n.text(fmt.rawValue)).tag(fmt)
                                 }
                             }
                             .labelsHidden()
@@ -221,7 +224,7 @@ public struct TapeRecorderView: View {
 
                 // Playback Routing Buttons (A1-A3, B1-B2)
                 VStack(spacing: 4) {
-                    Text("PLAY TO")
+                    Text(L10n.text("PLAY TO"))
                         .font(.system(size: 8, weight: .bold))
                         .foregroundColor(VMTheme.textSecondary)
 
@@ -255,7 +258,7 @@ public struct TapeRecorderView: View {
 
             // Scrubber Slider & Filename
             HStack(spacing: 8) {
-                Text(recorderPlayer.currentFileName)
+                Text(L10n.text(recorderPlayer.currentFileName))
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundColor(VMTheme.textSecondary)
                     .lineLimit(1)
@@ -284,6 +287,7 @@ public struct TapeRecorderView: View {
             .padding(.horizontal, 10)
             .padding(.bottom, 4)
         }
+        .disabled(recorderPlayer.isFinalizingRecording)
         .background(VMTheme.panelBackground)
         .cornerRadius(6)
         .overlay(

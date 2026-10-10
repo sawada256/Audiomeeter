@@ -131,7 +131,7 @@ private struct VerticalFaderInteraction: NSViewRepresentable {
         override var isFlipped: Bool { true }
         override init(frame: NSRect) {
             super.init(frame: frame); setAccessibilityElement(true); setAccessibilityRole(.slider)
-            setAccessibilityLabel("フェーダー"); setAccessibilityMinValue(-60); setAccessibilityMaxValue(12)
+            setAccessibilityLabel(L10n.text("フェーダー")); setAccessibilityMinValue(-60); setAccessibilityMaxValue(12)
         }
         required init?(coder: NSCoder) { fatalError() }
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }

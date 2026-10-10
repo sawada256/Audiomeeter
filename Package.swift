@@ -2,21 +2,21 @@
 import PackageDescription
 
 let package = Package(
-    name: "VoicemeeterMac",
+    name: "Audiomeeter",
     platforms: [
         .macOS(.v14)
     ],
     products: [
         .executable(
-            name: "VoicemeeterMac",
-            targets: ["VoicemeeterMac"]
+            name: "Audiomeeter",
+            targets: ["Audiomeeter"]
         )
     ],
     dependencies: [],
     targets: [
         .target(name: "VMNative", path: "Native/Realtime", publicHeadersPath: "include"),
         .executableTarget(
-            name: "VoicemeeterMac",
+            name: "Audiomeeter",
             dependencies: ["VMNative"],
             path: "Sources",
             linkerSettings: [

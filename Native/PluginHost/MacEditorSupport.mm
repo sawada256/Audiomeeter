@@ -22,10 +22,12 @@ extern "C" void vm_configure_editor_clicks(void* nativeView,void* plugin) {
     if(!actions) actions=[[VMEditorActions alloc] init];
     actions.plugin=plugin;
     NSMenu* menu=[[[NSMenu alloc] initWithTitle:@""] autorelease];
-    NSMenuItem* root=[[[NSMenuItem alloc] initWithTitle:@"Voicemeeter Plugin" action:nil keyEquivalent:@""] autorelease];
-    NSMenu* submenu=[[[NSMenu alloc] initWithTitle:@"Voicemeeter Plugin"] autorelease];
+    NSMenuItem* root=[[[NSMenuItem alloc] initWithTitle:@"Audiomeeter Plugin" action:nil keyEquivalent:@""] autorelease];
+    NSMenu* submenu=[[[NSMenu alloc] initWithTitle:@"Audiomeeter Plugin"] autorelease];
+    const char* language=getenv("AUDIOMEETER_LANGUAGE");
+    NSString* closeTitle=(language && strcmp(language,"en")==0) ? @"Close (Hide)" : @"閉じる（非表示）";
     for(NSString* key in @[@"w",@"q"]) {
-        NSMenuItem* hide=[[[NSMenuItem alloc] initWithTitle:@"閉じる（非表示）" action:@selector(hideEditor:) keyEquivalent:key] autorelease];
+        NSMenuItem* hide=[[[NSMenuItem alloc] initWithTitle:closeTitle action:@selector(hideEditor:) keyEquivalent:key] autorelease];
         hide.target=actions; [submenu addItem:hide];
     }
     root.submenu=submenu;[menu addItem:root];NSApp.mainMenu=menu;

@@ -6,8 +6,8 @@ enum AudioConfigurationError: LocalizedError { case message(String); var errorDe
 @main struct PluginWorkerTests {
     static func main() throws {
         let root = FileManager.default.currentDirectoryPath + "/.build/plugin-host/"
-        let gain = try HostedInsert(config: InsertConfig(path: root+"VMTestGain_artefacts/Release/VST3/Voicemeeter Test Gain.vst3", name: "Gain", position: .pre), rate: 48000, block: 512)
-        let side = try HostedInsert(config: InsertConfig(path: root+"VMTestSide_artefacts/Release/VST3/Voicemeeter Test Sidechain.vst3", name: "Side", position: .post), rate: 48000, block: 512)
+        let gain = try HostedInsert(config: InsertConfig(path: root+"VMTestGain_artefacts/Release/VST3/Audiomeeter Test Gain.vst3", name: "Gain", position: .pre), rate: 48000, block: 512)
+        let side = try HostedInsert(config: InsertConfig(path: root+"VMTestSide_artefacts/Release/VST3/Audiomeeter Test Sidechain.vst3", name: "Side", position: .post), rate: 48000, block: 512)
         for slot in [gain,side] {
             let deadline = Date().addingTimeInterval(15)
             while slot.status == "読込中…" && Date() < deadline { usleep(20000); slot.refresh() }

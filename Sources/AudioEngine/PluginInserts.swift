@@ -70,11 +70,11 @@ final class HostedInsert {
     private func launch(rate: Double, block: UInt32) throws {
         self.rate = rate; self.block = block; faultMessage = nil; started = Date()
         let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
-        directory = FileManager.default.temporaryDirectory.appendingPathComponent("voicemeeter-worker-\(token)")
+        directory = FileManager.default.temporaryDirectory.appendingPathComponent("audiomeeter-worker-\(token)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
         semaphore = "/vmw-" + token.prefix(20)
         handle = vmw_open(directory.appendingPathComponent("audio").path, semaphore, Int32(block), rate)
-        guard handle != nil else { throw AudioConfigurationError.message("プラグインIPCを作成できませんでした。") }
+        guard handle != nil else { throw AudioConfigurationError.message(L10n.text("プラグインIPCを作成できませんでした。")) }
         vmw_seed_latency(handle, Int32(config.savedLatency ?? 0))
         let settings: [String: Any] = ["path": config.path, "identifier": config.identifier ?? "", "state": config.state,
             "rate": rate, "shared": directory.appendingPathComponent("audio").path, "semaphore": semaphore,
@@ -82,6 +82,9 @@ final class HostedInsert {
         let file = directory.appendingPathComponent("config.json")
         try JSONSerialization.data(withJSONObject: settings).write(to: file, options: .atomic)
         let process = Process(); process.executableURL = PluginRuntime.workerURL
+        var environment = ProcessInfo.processInfo.environment
+        environment["AUDIOMEETER_LANGUAGE"] = LocalizationStore.shared.language
+        process.environment = environment
         process.arguments = [file.path]; process.standardOutput = FileHandle.nullDevice; process.standardError = FileHandle.nullDevice
         do { try process.run(); worker = process }
         catch { dispose(); throw error }
@@ -103,9 +106,9 @@ final class HostedInsert {
     var lateBlocks: UInt64 { handle == nil ? 0 : vmw_late(handle) }
     var status: String {
         if let faultMessage { return faultMessage }
-        guard handle != nil else { return "ワーカーを起動できませんでした" }
-        if vmw_fault(handle) != 0 { return "処理が間に合いません。遅延を保ってバイパス中" }
-        return vmw_ready(handle) == 0 ? "読込中…" : ""
+        guard handle != nil else { return L10n.text("ワーカーを起動できませんでした") }
+        if vmw_fault(handle) != 0 { return L10n.text("処理が間に合いません。遅延を保ってバイパス中") }
+        return vmw_ready(handle) == 0 ? L10n.text("読込中…") : ""
     }
     func refresh() {
         guard let handle else { return }
@@ -115,9 +118,9 @@ final class HostedInsert {
             if let state = metadata["state"] as? String { config.state = state }
             if let error = metadata["error"] as? String { faultMessage = error }
         }
-        if vmw_ready(handle) == 2 { faultMessage = faultMessage ?? "プラグインを読み込めませんでした"; vmw_set_fault(handle, 1) }
-        if let worker, !worker.isRunning { faultMessage = faultMessage ?? "プラグインが終了しました（遅延を保ってバイパス中）"; vmw_set_fault(handle, 2) }
-        if vmw_ready(handle) == 0 && Date().timeIntervalSince(started) > 15 { faultMessage = "プラグインの読込がタイムアウトしました"; vmw_set_fault(handle, 3) }
+        if vmw_ready(handle) == 2 { faultMessage = faultMessage ?? L10n.text("プラグインを読み込めませんでした"); vmw_set_fault(handle, 1) }
+        if let worker, !worker.isRunning { faultMessage = faultMessage ?? L10n.text("プラグインが終了しました（遅延を保ってバイパス中）"); vmw_set_fault(handle, 2) }
+        if vmw_ready(handle) == 0 && Date().timeIntervalSince(started) > 15 { faultMessage = L10n.text("プラグインの読込がタイムアウトしました"); vmw_set_fault(handle, 3) }
         if vmw_fault(handle) != 0, let worker, worker.isRunning { kill(worker.processIdentifier, SIGKILL) }
         config.savedLatency = max(0, latency - Int(block))
     }

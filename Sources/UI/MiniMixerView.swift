@@ -3,6 +3,7 @@ import AppKit
 import Combine
 
 struct MiniMixerView: View {
+    @ObservedObject private var localization = LocalizationStore.shared
     @ObservedObject var state: AppState
     private var preferences: DesktopControlsPreferences { state.desktopControls }
     private var trimStrips: [StripID] {
@@ -34,7 +35,7 @@ struct MiniMixerView: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack { Text("MINI MIXER").font(.system(size: 9, weight: .bold)); Spacer(); Text("dB").font(.system(size: 9)).foregroundStyle(.secondary) }
+            HStack { Text(L10n.text("MINI MIXER")).font(.system(size: 9, weight: .bold)); Spacer(); Text("dB").font(.system(size: 9)).foregroundStyle(.secondary) }
             ForEach(InsertTarget.all) { target in
                 let options = preferences.overlayChannels[target.id] ?? MiniMixerChannel()
                 let muted = isMuted(target)
@@ -47,32 +48,32 @@ struct MiniMixerView: View {
                                 .font(.system(size: 9)).foregroundStyle(.orange)
                                 .frame(width: 14)
                                 .opacity(muted ? 1 : 0)
-                                .accessibilityLabel("\(target.name) ミュート中")
+                                .accessibilityLabel(L10n.text("{0} ミュート中", [String(describing: target.name)]))
                                 .accessibilityHidden(!muted)
                         }.frame(width: 42, alignment: .leading)
                         if options.fader {
-                            MiniGainSlider(value: gain(target), range: -60...12, neutral: 0, scrollStep: preferences.gainStep, reverseTrackpad: preferences.reverseTrackpadScroll ?? true, reverseMouse: preferences.reverseMouseScroll ?? true, label: "\(target.name) フェーダー", muted: muted).frame(height: 28)
+                            MiniGainSlider(value: gain(target), range: -60...12, neutral: 0, scrollStep: preferences.gainStep, reverseTrackpad: preferences.reverseTrackpadScroll ?? true, reverseMouse: preferences.reverseMouseScroll ?? true, label: L10n.text("{0} フェーダー", [String(describing: target.name)]), muted: muted).frame(height: 28)
                             Text(String(format: "%+.1f", gain(target).wrappedValue)).font(.system(size: 9, design: .monospaced)).frame(width: 38)
                         }
-                        if options.meter { LiveCompactStereoMeter(meters: state.meterStore, target: target).frame(width: options.fader ? 58 : 222, height: 12).accessibilityLabel("\(target.name) レベルメーター") }
+                        if options.meter { LiveCompactStereoMeter(meters: state.meterStore, target: target).frame(width: options.fader ? 58 : 222, height: 12).accessibilityLabel(L10n.text("{0} レベルメーター", [String(describing: target.name)])) }
                     }.frame(height: 28)
                 }
             }
             if preferences.showAppTrims {
                 Divider()
-                if trimStrips.isEmpty { Text("OSの出力先がVAIO／AUXではありません").font(.caption2).foregroundStyle(.secondary) }
+                if trimStrips.isEmpty { Text(L10n.text("OSの出力先がVAIO／AUXではありません")).font(.caption2).foregroundStyle(.secondary) }
                 ForEach(trimStrips) { strip in
                     Text("\(strip.shortName) • APPS").font(.system(size: 9, weight: .bold))
                     if state.appTrimSupported[strip] != true {
-                        Text(state.appTrimErrors[strip] ?? "アプリ別トリムを取得中…").font(.caption2).foregroundStyle(.secondary)
+                        Text(state.appTrimErrors[strip] ?? L10n.text("アプリ別トリムを取得中…")).font(.caption2).foregroundStyle(.secondary)
                     } else {
                         let items = strip == .virtualVAIO ? state.vaioAppVolumes : state.auxAppVolumes
-                        if items.isEmpty { Text("出力中のアプリなし").font(.caption2).foregroundStyle(.secondary) }
+                        if items.isEmpty { Text(L10n.text("出力中のアプリなし")).font(.caption2).foregroundStyle(.secondary) }
                         if !items.isEmpty { ScrollView {
                         ForEach(items) { item in
                             HStack(spacing: 6) {
                                 Text(item.name).font(.system(size: 10)).lineLimit(1).frame(width: 100, alignment: .leading)
-                                MiniGainSlider(value: appGain(strip: strip, item: item), range: 0...2, neutral: 1, scrollStep: 0.05, reverseTrackpad: preferences.reverseTrackpadScroll ?? true, reverseMouse: preferences.reverseMouseScroll ?? true, label: "\(item.name) トリム").frame(height: 28)
+                                MiniGainSlider(value: appGain(strip: strip, item: item), range: 0...2, neutral: 1, scrollStep: 0.05, reverseTrackpad: preferences.reverseTrackpadScroll ?? true, reverseMouse: preferences.reverseMouseScroll ?? true, label: L10n.text("{0} トリム", [String(describing: item.name)])).frame(height: 28)
                                 Text("\(Int(item.volume * 100))%").font(.system(size: 9, design: .monospaced)).frame(width: 35)
                             }.frame(height: 28)
                         }
@@ -81,9 +82,10 @@ struct MiniMixerView: View {
                 }
             }
             if !preferences.overlayChannels.values.contains(where: { $0.fader || $0.meter }) && !preferences.showAppTrims {
-                Text("設定で表示するフェーダー／メーターを選択").font(.caption2).foregroundStyle(.secondary)
+                Text(L10n.text("設定で表示するフェーダー／メーターを選択")).font(.caption2).foregroundStyle(.secondary)
             }
         }
+        .id(localization.language)
         .padding(12).frame(width: 330)
         .foregroundStyle(.white)
         .background(Color(red: 0.10, green: 0.12, blue: 0.14), in: RoundedRectangle(cornerRadius: 10))
@@ -107,7 +109,7 @@ private struct MiniGainSlider: NSViewRepresentable {
     func updateNSView(_ view: Track, context: Context) {
         view.value = value; view.range = range; view.neutral = neutral; view.scrollStep = scrollStep; view.changed = { value = $0 }; view.needsDisplay = true
         view.reverseTrackpad = reverseTrackpad; view.reverseMouse = reverseMouse; view.muted = muted
-        view.setAccessibilityHelp(muted ? "ミュート中。フェーダーは調整できます" : "")
+        view.setAccessibilityHelp(muted ? L10n.text("ミュート中。フェーダーは調整できます") : "")
         view.setAccessibilityLabel(label); view.setAccessibilityValue(NSNumber(value: value))
         view.setAccessibilityMinValue(NSNumber(value: range.lowerBound)); view.setAccessibilityMaxValue(NSNumber(value: range.upperBound))
     }
@@ -204,7 +206,7 @@ private final class MiniMixerHostingView: NSHostingView<MiniMixerView> {
         panel = MiniMixerPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.contentView = hosting; panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = true
         panel.level = .floating; panel.hidesOnDeactivate = false; panel.isFloatingPanel = true
-        panel.title = "Voicemeeter Mini Mixer"; panel.canHide = false; panel.isExcludedFromWindowsMenu = true
+        panel.title = "Audiomeeter Mini Mixer"; panel.canHide = false; panel.isExcludedFromWindowsMenu = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         Self.current = self
         hotkeys.overlayHeld = { [weak self] down in guard let self, self.held != down else { return }; self.held = down; self.updatePanel() }
