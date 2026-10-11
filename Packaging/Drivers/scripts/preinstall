@@ -1,0 +1,16 @@
+#!/bin/bash
+set -euo pipefail
+[ "${3:-/}" = / ] || { echo 'Install on the running system volume only.' >&2; exit 1; }
+if pgrep -x Audiomeeter >/dev/null || pgrep -x VoicemeeterMac >/dev/null; then
+    echo 'Quit Audiomeeter/Voicemeeter and audio apps before installing. / 音声アプリを終了してください。' >&2
+    exit 1
+fi
+TASK_HAL=/Library/Audio/Plug-Ins/HAL
+TASK_BACKUP="/Library/Application Support/Audiomeeter/InstallerBackups/$(date +%Y%m%d-%H%M%S)-drivers"
+for TASK_NAME in Audiomeeter AudiomeeterAUX AudiomeeterB1 AudiomeeterB2; do
+    [ ! -L "$TASK_HAL/$TASK_NAME.driver" ] || { echo 'Refusing symbolic-link driver target.' >&2; exit 1; }
+done
+mkdir -p "$TASK_BACKUP"; chmod 700 "$TASK_BACKUP"
+for TASK_NAME in Audiomeeter AudiomeeterAUX AudiomeeterB1 AudiomeeterB2; do
+    if [ -d "$TASK_HAL/$TASK_NAME.driver" ]; then ditto "$TASK_HAL/$TASK_NAME.driver" "$TASK_BACKUP/$TASK_NAME.driver"; fi
+done

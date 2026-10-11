@@ -7,9 +7,9 @@ paths = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root).decode().sp
 errors = []
 for name in filter(None, paths):
     p = Path(name)
-    if any(x in {'.build', '.DS_Store', 'node_modules'} or x.endswith(('.app', '.driver')) for x in p.parts):
+    if any(x in {'.build', 'dist', '.DS_Store', 'node_modules'} or x.endswith(('.app', '.driver')) for x in p.parts):
         errors.append(name)
-    if p.suffix.lower() in {'.log', '.p12', '.pem', '.wav', '.m4a', '.sample'} or p.name in {'settings.json', 'plugin-catalog.json'}:
+    if p.suffix.lower() in {'.log', '.p12', '.pem', '.wav', '.m4a', '.sample', '.pkg', '.dmg', '.gz'} or p.name in {'settings.json', 'plugin-catalog.json'}:
         errors.append(name)
     if p.suffix in {'.swift', '.c', '.cpp', '.mm', '.sh', '.json'}:
         data = (root / p).read_text()

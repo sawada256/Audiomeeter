@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-only
 set -e
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -30,11 +31,12 @@ build_driver() {
     rm -rf "$BUNDLE_NAME"
     mkdir -p "$BUNDLE_NAME/Contents/MacOS"
 
-    clang -bundle -arch arm64 \
+    clang -bundle -arch arm64 -mmacosx-version-min=14.0 \
         -isysroot "$SDK_PATH" \
         -framework CoreAudio -framework CoreFoundation -framework Accelerate \
         -DkDriver_Name="\"$DRIVER_NAME\"" \
         -DkDevice_Name="\"$DEVICE_NAME\"" \
+        -DkManufacturer_Name="\"Audiomeeter contributors\"" \
         -DkHas_Driver_Name_Format=false \
         -DkPlugIn_BundleID="\"$BUNDLE_ID\"" \
         -DkNumber_Of_Channels=$CHANNELS \
@@ -56,7 +58,7 @@ build_driver() {
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>$DRIVER_NAME</string>
+    <string>$DEVICE_NAME</string>
     <key>CFBundlePackageType</key>
     <string>BNDL</string>
     <key>CFBundleShortVersionString</key>
@@ -64,7 +66,7 @@ build_driver() {
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>2</string>
     <key>CFPlugInFactories</key>
     <dict>
         <key>$FACTORY_ID</key>
@@ -83,20 +85,25 @@ EOF
 
     mkdir -p "$BUNDLE_NAME/Contents/Resources"
     cp "$DIR/../LICENSES/BlackHole-GPL-3.0.txt" "$BUNDLE_NAME/Contents/Resources/LICENSE.txt"
-    codesign --force --deep --sign - "$BUNDLE_NAME"
+    cp "$DIR/MODIFICATIONS.md" "$BUNDLE_NAME/Contents/Resources/NOTICE.md"
+    if [ -n "${VM_DRIVER_SIGNING_IDENTITY:-}" ]; then
+        codesign --force --options runtime --timestamp --sign "$VM_DRIVER_SIGNING_IDENTITY" "$BUNDLE_NAME"
+    else
+        codesign --force --sign - "$BUNDLE_NAME"
+    fi
     echo "Successfully built $BUNDLE_NAME"
 }
 
 # 1. Virtual Input 1: Audiomeeter (VAIO Playback -> Strip 4 VAIO)
-build_driver "Audiomeeter.driver" "Audiomeeter" "Audiomeeter" "local.audiomeeter" 2 1
+build_driver "Audiomeeter.driver" "Audiomeeter" "Audiomeeter VAIO" "local.audiomeeter.driver.vaio" 2 1
 
 # 2. Virtual Input 2: Audiomeeter AUX (AUX Playback -> Strip 5 AUX)
-build_driver "AudiomeeterAUX.driver" "AudiomeeterAUX" "Audiomeeter AUX" "local.audiomeeter.aux" 2 1
+build_driver "AudiomeeterAUX.driver" "AudiomeeterAUX" "Audiomeeter AUX" "local.audiomeeter.driver.aux" 2 1
 
 # 3. Virtual Output 1: Audiomeeter B1 (Master Bus B1 -> Virtual Mic / Discord / DAW In)
-build_driver "AudiomeeterB1.driver" "AudiomeeterB1" "Audiomeeter B1" "local.audiomeeter.b1" 2
+build_driver "AudiomeeterB1.driver" "AudiomeeterB1" "Audiomeeter B1" "local.audiomeeter.driver.b1" 2
 
 # 4. Virtual Output 2: Audiomeeter B2 (Master Bus B2 -> Secondary Out / DAW In)
-build_driver "AudiomeeterB2.driver" "AudiomeeterB2" "Audiomeeter B2" "local.audiomeeter.b2" 2
+build_driver "AudiomeeterB2.driver" "AudiomeeterB2" "Audiomeeter B2" "local.audiomeeter.driver.b2" 2
 
 echo "All 4 Audiomeeter Audio Drivers built successfully!"

@@ -49,6 +49,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppState.shared.shutdown()
     }
 
+    @objc private func showLicenses() {
+        guard let resource = Bundle.main.resourceURL else { return }
+        NSWorkspace.shared.open(resource.appendingPathComponent("LICENSE.md"))
+    }
+
     @objc private func refreshLanguage() { setupMainMenu() }
 
     private func setupMainMenu() {
@@ -59,6 +64,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let appMenu = NSMenu()
 
         appMenu.addItem(withTitle: L10n.text("About Audiomeeter"), action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        let licenses = appMenu.addItem(withTitle: L10n.text("ライセンスとソースコードについて"), action: #selector(showLicenses), keyEquivalent: "")
+        licenses.target = self
         appMenu.addItem(NSMenuItem.separator())
 
         let show = appMenu.addItem(withTitle: L10n.text("ミキサーを表示"), action: #selector(showMixer), keyEquivalent: "")

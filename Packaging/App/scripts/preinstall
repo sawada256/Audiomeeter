@@ -1,0 +1,14 @@
+#!/bin/bash
+set -euo pipefail
+[ "${3:-/}" = / ] || { echo 'Install on the running system volume only.' >&2; exit 1; }
+if pgrep -x Audiomeeter >/dev/null; then
+    echo 'Quit Audiomeeter and run the installer again. / Audiomeeterを終了して再実行してください。' >&2
+    exit 1
+fi
+TASK_TARGET=/Applications/Audiomeeter.app
+if [ -L "$TASK_TARGET" ]; then echo 'Refusing symbolic-link install target.' >&2; exit 1; fi
+if [ -d "$TASK_TARGET" ]; then
+    TASK_BACKUP="/Library/Application Support/Audiomeeter/InstallerBackups/$(date +%Y%m%d-%H%M%S)-app"
+    mkdir -p "$TASK_BACKUP"; chmod 700 "$TASK_BACKUP"
+    ditto "$TASK_TARGET" "$TASK_BACKUP/Audiomeeter.app"
+fi

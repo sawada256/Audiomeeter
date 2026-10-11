@@ -1,12 +1,12 @@
-# Audiomeeter v1
+# Audiomeeter
 
-A private development snapshot of a stereo mixer for Apple Silicon and macOS 14+. Audiomeeter is an independent project, not an official VB-Audio product and not a claim of binary/driver compatibility.
+A local pre-release stereo mixer for Apple Silicon and macOS 14+. Audiomeeter is an independent project, not an official VB-Audio product and not a claim of binary/driver compatibility.
 
 Three hardware inputs, VAIO/AUX virtual inputs, A1–A3/B1/B2 output buses, stereo channel mapping, EQ presets, dynamics, PAN, recording/playback, app trims, custom/media hotkeys, and a mini mixer are included. ARM64 VST3 effects run in separate worker processes with PRE/POST inserts, sidechain routing, and latency compensation. VST2/AU, Intel-only plugins, surround, and Windows ASIO compatibility are not implemented.
 
 Japanese is the default. Switch to English in Audio Settings → 言語 / Language. Third-party plugin editors, native OS authorization dialogs, and device/application names remain controlled by their vendors or the OS.
 
-Build using `./build_app.sh` and verify with `./Tests/run_audio_tests.sh`. See [installation](INSTALL.en.md). No Git remote is configured. A release license for project-owned code has not been selected; this is not a cleared-for-distribution release. Read [licensing](LICENSING.ja.md) and [audit / release blockers](AUDIT.ja.md) before publishing.
+Build using `./build_app.sh` and verify with `./Tests/run_audio_tests.sh`. See [installation](INSTALL.en.md). No Git remote is configured. Project-owned code is licensed AGPL-3.0-only, with independent HAL drivers under GPL-3.0-only. Signing/notarization and the remaining provenance/trademark checks are not complete. Read [licensing](LICENSING.ja.md) and [audit / release blockers](AUDIT.ja.md) before publishing.
 
 ## Input PADs and spectrum analyzer (build 5)
 
@@ -31,3 +31,7 @@ Spectrum Top selects the upper display level (−60 to +24 dB); Range selects a 
 Right-click LIMIT to select Lookahead OFF/1/3/5/10/20 ms. OFF preserves legacy zero-latency soft-knee waveshaping. ON adds the selected delay and uses linked stereo sliding-peak gain control with a 50 ms release. This is sample-peak limiting, not true-peak processing. Delay participates in existing route/output alignment; mode changes reset history and may briefly interrupt audio. Default remains OFF.
 
 Build 10 keeps EQ curve drags local to the editor and previews audio at up to 60 Hz, committing shared settings only on release or dismissal. Spectrum capture, FFT and display timers stop when the EQ editor closes, even if its saved spectrum preference is ON.
+
+## Distribution preparation
+
+`./build_installers.sh` produces separate App/Drivers packages and matching source including pinned JUCE in ignored `dist/`. Changes must be committed first. Default packages are unsigned local tests, not notarized releases. The existing owner-commissioned AI-generated icon is retained unchanged in local and distribution builds; its provenance is documented in `Assets/AppIcon.md`. See `LICENSE.md`, `THIRD_PARTY_NOTICES.md` and the Japanese distribution guide for remaining release gates.

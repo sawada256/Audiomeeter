@@ -17,3 +17,11 @@
 *.pem
 settings.json
 plugin-catalog.json
+
+*.pkg
+*.dmg
+*.tar.gz
+dist/
+
+__pycache__/
+*.pyc

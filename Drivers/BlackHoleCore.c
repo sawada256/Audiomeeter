@@ -1,3 +1,7 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * Modified for Audiomeeter, 2026. See MODIFICATIONS.md.
+ * Original copyright and GPL rights remain with their respective holders.
+ */
 /*
      File: BlackHole.c
   

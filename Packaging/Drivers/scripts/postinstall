@@ -1,0 +1,12 @@
+#!/bin/bash
+set -euo pipefail
+[ "${3:-/}" = / ] || exit 1
+for TASK_NAME in Audiomeeter AudiomeeterAUX AudiomeeterB1 AudiomeeterB2; do
+    TASK_BUNDLE="/Library/Audio/Plug-Ins/HAL/$TASK_NAME.driver"
+    [ -d "$TASK_BUNDLE" ] && [ ! -L "$TASK_BUNDLE" ] || exit 1
+    chown -R root:wheel "$TASK_BUNDLE"
+    chmod -R go-w "$TASK_BUNDLE"
+done
+# Core Audio restart temporarily stops all audio. Installer welcome explains this.
+/usr/bin/killall coreaudiod || true
+exit 0

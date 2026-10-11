@@ -1,5 +1,17 @@
 # インストールと更新
 
+## パッケージから導入
+
+Apple Silicon / macOS 14以降用の本体用 `Audiomeeter-App-*.pkg` と、ドライバ用 `Audiomeeter-Drivers-*.pkg` をそれぞれ開きます。利用者側でXcodeやCMakeは不要です。Audiomeeterを終了し、ドライバ導入時はDAW等の音声アプリも終了してください。管理者認証が必要で、導入後Core Audioが再起動します。
+
+現在生成する `LOCAL-UNSIGNED` は未公証のローカル検証用で、一般配布用ではありません。macOSのセキュリティ機能を無効化する手順は使用しません。一般配布はDeveloper ID署名・公証を完了したパッケージを使用してください。
+
+配置は本体 `/Applications/Audiomeeter.app`、ドライバ `/Library/Audio/Plug-Ins/HAL/`。以前のAudiomeeterファイルは `/Library/Application Support/Audiomeeter/InstallerBackups/` に管理者専用で保存します。導入失敗時は自動復元を保証せず、このバックアップから復元してください。VoicemeeterやBlackHoleの既存ドライバと個人設定は残ります。
+
+新しいデバイス名は **Audiomeeter VAIO／Audiomeeter AUX／Audiomeeter B1／Audiomeeter B2** です。旧ドライバと共存するため、既存設定からは入力VAIO/AUX・出力B1/B2を手動で新デバイスへ選び直し、macOSやDAW側の選択も変更してください。UIDは既存Audiomeeter版と同じで、表示名変更による再割当てを避けます。
+
+以下はソースから作る開発者向けの説明です。
+
 ## 必要環境
 
 - Apple Silicon、macOS 14以降。Intel版・Windows版はありません。
@@ -27,7 +39,7 @@ open Audiomeeter.app
 
 専用HALドライバー4個をビルドし、`/Library/Audio/Plug-Ins/HAL`に導入します。管理者認証を求めます。Core Audioを再起動するためMac全体の音声が一時停止します。既存Audiomeeterドライバーをバックアップします。VoicemeeterやBlackHoleのドライバーは削除しません。
 
-- Audiomeeter：VAIOへの再生、B1からの録音を同一デバイスで提供。
+- Audiomeeter VAIO：VAIOへの再生、B1からの録音を同一デバイスで提供。
 - Audiomeeter AUX：AUXへの再生、B2からの録音を同一デバイスで提供。
 - Audiomeeter B1 / B2：仮想マイク側の独立端点。
 
@@ -36,10 +48,10 @@ open Audiomeeter.app
 ## 基本設定
 
 1. A1にヘッドフォン／スピーカーを選ぶ。最初は音量を低くする。
-2. VAIO入力にAudiomeeter、AUX入力にAudiomeeter AUXを選ぶ。
-3. macOSの出力をAudiomeeterにし、VAIO → A1をON。
+2. VAIO入力にAudiomeeter VAIO、AUX入力にAudiomeeter AUXを選ぶ。
+3. macOSの出力をAudiomeeter VAIOにし、VAIO → A1をON。
 4. 配信・通話には必要な入力をB1へ送り、相手アプリの入力をAudiomeeter B1にする。
-5. DAWでAudiomeeterを選ぶと再生VAIO／録音B1。VAIO → B1の戻しで意図しないループを作らない。
+5. DAWでAudiomeeter VAIOを選ぶと再生VAIO／録音B1。VAIO → B1の戻しで意図しないループを作らない。
 6. 複数出力機器はチャンネル割り当てで左右を指定。現在はバス単位で保存され、デバイス別のプリセットではありません。
 
 録音は`~/Music/AudiomeeterRecordings`、設定とプラグインカタログは`~/Library/Application Support/Audiomeeter`に保存します。日本語／英語はオーディオ設定の言語選択で切り替えます。

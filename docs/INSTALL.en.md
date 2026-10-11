@@ -15,3 +15,11 @@ Recordings: `~/Music/AudiomeeterRecordings`. Settings/catalog: `~/Library/Applic
 To uninstall, quit the app and move it to Trash. Remove/backup only the four Audiomeeter `.driver` bundles from `/Library/Audio/Plug-Ins/HAL` with administrator rights, then restart macOS. Preserve other vendors' drivers and your recordings. App/driver backups live in `.build/installation-backup`.
 
 Run `./Tests/run_audio_tests.sh` for offline verification. Optional live HAL tests require exclusive access and can interrupt audio; read the script before enabling them.
+
+## Installer packages
+
+Open the separate Audiomeeter-App and Audiomeeter-Drivers packages on Apple Silicon/macOS 14+. End users do not need build tools. Quit the mixer and audio apps first; driver installation restarts Core Audio. Existing Audiomeeter files are backed up under `/Library/Application Support/Audiomeeter/InstallerBackups/`. Other products and user data are preserved. Recovery after an installation failure may require restoring those backups manually.
+
+LOCAL-UNSIGNED packages are local test artifacts, not notarized public releases. Do not disable Gatekeeper to deploy them. Public release requires Developer ID signing and notarization.
+
+Select Audiomeeter VAIO, Audiomeeter AUX, Audiomeeter B1 and Audiomeeter B2 in the mixer, macOS and DAW. Legacy drivers remain installed; switch selections manually when migrating. Audiomeeter UIDs remain stable.

@@ -1,0 +1,11 @@
+Audiomeeter — Apple Silicon / macOS 14+
+
+Audiomeeterを終了してください。ドライバ導入時はDAW・通話アプリ等も終了してください。
+ドライバの導入はCore Audioを再起動し、Mac全体の音声が一時停止します。
+既存のAudiomeeterアプリ／ドライバは管理者専用バックアップへ保存します。
+Voicemeeter、BlackHole、その他のドライバや個人設定・録音は削除しません。
+
+Quit Audiomeeter before installation. For drivers, also quit DAWs/calling/audio apps.
+Driver installation restarts Core Audio and temporarily interrupts all system audio.
+Previous Audiomeeter files are backed up; other products, user settings and recordings
+are preserved. Select Audiomeeter VAIO/AUX/B1/B2 in your audio applications afterwards.

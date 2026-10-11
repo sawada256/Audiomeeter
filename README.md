@@ -1,8 +1,8 @@
-# Audiomeeter v1
+# Audiomeeter
 
 [入力PAD・スペアナ](docs/PADS_SPECTRUM.ja.md) · [出力バスの操作・処理順](docs/OUTPUT_BUS.ja.md) · [English](docs/README.en.md) · [インストール](docs/INSTALL.ja.md) · [検証・既知の課題](docs/AUDIT.ja.md) · [ライセンス整理](docs/LICENSING.ja.md)
 
-Apple Silicon / macOS 14以降向けのステレオ音声ミキサー。現在は個人用の非公開開発スナップショットです。VB-Audio製品とは独立した実装であり、同社の公式製品・互換製品ではありません。
+Apple Silicon / macOS 14以降向けのステレオ音声ミキサー。現在は公開準備中のローカル開発版です。VB-Audio製品とは独立した実装であり、同社の公式製品・互換製品ではありません。
 
 ## 機能
 
@@ -28,4 +28,8 @@ open Audiomeeter.app
 
 Command Line Tools、CMake、Gitが必要です。JUCE 8.0.12を固定コミットから取得します。生成物・キャッシュ・ログ・ユーザー設定・録音はGit管理しません。テストは品質維持のため同梱します。
 
-このリポジトリにはリモートを設定していません。独自コードの公開ライセンスは未選択であり、そのまま公開可能と判断したリリースではありません。外部配布前に[公開前の課題](docs/AUDIT.ja.md)と[ライセンス整理](docs/LICENSING.ja.md)を確認してください。
+アプリ・ホスト・配布ツールはAGPL-3.0-only、独立HALドライバはGPL-3.0-onlyです。`LICENSE.md`と第三者通知を確認してください。リモートは未設定で、署名・公証・権利確認を完了した一般配布版ではありません。外部配布前に[公開前の課題](docs/AUDIT.ja.md)と[ライセンス整理](docs/LICENSING.ja.md)を確認してください。
+
+## インストーラーを作成
+
+変更をGitへ記録した状態で `./build_installers.sh` を実行すると、`dist/`へ本体用・ドライバ用の2つの `.pkg`、対応ソース一式、SHA-256マニフェストを作成します。既定は未公証・未署名のローカル検証用パッケージです。インストールやアップロードは自動では行いません。[配布手順](docs/DISTRIBUTION.ja.md)を参照してください。

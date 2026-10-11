@@ -18,6 +18,7 @@ echo "Packaging $APP_NAME..."
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$CONTENTS_DIR/Frameworks"
 cp "$DIR/Assets/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+cp "$DIR/LICENSE.md" "$RESOURCES_DIR/LICENSE.md"
 cp "$DIR/.build/plugin-host/libVMPluginHost.dylib" "$CONTENTS_DIR/Frameworks/"
 
 cp -R "$DIR/LICENSES" "$RESOURCES_DIR/LICENSES"
@@ -35,7 +36,7 @@ cat << 'WORKER_EOF' > "$WORKER_CONTENTS/Info.plist"
 <key>CFBundleName</key><string>Audiomeeter Plugin</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>1.0.0</string>
-<key>CFBundleVersion</key><string>11</string>
+<key>CFBundleVersion</key><string>12</string>
 <key>LSUIElement</key><true/>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSHighResolutionCapable</key><true/>
@@ -60,6 +61,8 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
     <string>Audiomeeter</string>
     <key>CFBundleDisplayName</key>
     <string>Audiomeeter</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright 2026 Audiomeeter contributors. AGPL-3.0-only; no warranty. See LICENSE.md and third-party notices.</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundlePackageType</key>
@@ -67,7 +70,7 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
     <key>CFBundleShortVersionString</key>
     <string>1.0.0</string>
     <key>CFBundleVersion</key>
-    <string>11</string>
+    <string>12</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSHighResolutionCapable</key>
@@ -80,13 +83,25 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
 </plist>
 EOF
 
+if [ "${VM_RELEASE_BUILD:-0}" = 1 ]; then
+    plutil -insert AudiomeeterReleaseBuild -bool true "$CONTENTS_DIR/Info.plist"
+fi
+
 # A certificate-backed identity keeps the designated requirement stable across
 # updates, so macOS privacy permissions can follow subsequent builds.
 VM_SIGNING_IDENTITY="${VM_CODESIGN_IDENTITY:-}"
 if [ -z "$VM_SIGNING_IDENTITY" ]; then
     VM_SIGNING_IDENTITY="$(security find-identity -v -p codesigning | awk '/"Apple Development:/{print $2; exit}')"
 fi
-if [ -n "$VM_SIGNING_IDENTITY" ]; then
+if [ "${VM_DISTRIBUTION_SIGN:-0}" = 1 ]; then
+    case "$VM_SIGNING_IDENTITY" in
+        "Developer ID Application:"*) ;;
+        *) echo "Distribution requires an explicit Developer ID Application identity." >&2; exit 1 ;;
+    esac
+    codesign --force --options runtime --timestamp --sign "$VM_SIGNING_IDENTITY" "$CONTENTS_DIR/Frameworks/libVMPluginHost.dylib"
+    codesign --force --options runtime --timestamp --entitlements "$DIR/Packaging/PluginWorker.entitlements" --sign "$VM_SIGNING_IDENTITY" "$CONTENTS_DIR/Helpers/VMPluginWorker.app"
+    codesign --force --options runtime --timestamp --sign "$VM_SIGNING_IDENTITY" "$APP_DIR"
+elif [ -n "$VM_SIGNING_IDENTITY" ]; then
     codesign --force --deep --sign "$VM_SIGNING_IDENTITY" "$APP_DIR"
 else
     echo "No development signing identity found; ad-hoc updates may require privacy permissions to be renewed."
