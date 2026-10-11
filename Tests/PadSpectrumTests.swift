@@ -13,6 +13,24 @@ import Foundation
         precondition(middle.max()! - middle.min()! < 0.6, "Pink power +3.01 dB/oct should be flat")
         let lowRate = SpectrumFFT.display(pink,rate:32000,size:n,slope:0)
         precondition(lowRate.last == -120, "Shared 20 Hz–20 kHz axis must not stretch frequencies below Nyquist")
+        let mailbox = SpectrumFrameMailbox()
+        let oldToken = mailbox.invalidate()
+        for i in 0..<1000 { mailbox.publish([Float(i)],generation:oldToken) }
+        precondition(mailbox.take() == [999] && mailbox.take() == nil, "Display backlog must collapse to newest frame")
+        let token = mailbox.invalidate()
+        mailbox.publish([1],generation:oldToken)
+        precondition(mailbox.take() == nil, "Closed/reconfigured analyzer must reject stale work")
+        mailbox.publish([2],generation:token)
+        precondition(mailbox.take() == [2])
+        var eq = MasterEQConfig()
+        eq.bands[0].gainDB = 6; eq.bands[3].gainDB = -8
+        for rate:Float in [44100,48000,96000] {
+            let curve = ParametricEQ6Band.responseCurve(config:eq,sampleRate:rate)
+            for i in curve.indices {
+                let f = 20*powf(1000,Float(i)/200)
+                precondition(abs(curve[i]-ParametricEQ6Band.combinedResponseDB(config:eq,freq:f,sampleRate:rate))<0.00001)
+            }
+        }
         let capture = SpectrumCapture()
         tone.withUnsafeBufferPointer { capture.write(bus:.A1,buffer:$0.baseAddress!,frames:n,sampleRate:48000) }
         precondition(capture.ring.availableRead()==0)

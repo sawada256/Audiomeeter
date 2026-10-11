@@ -159,9 +159,9 @@ struct EQMiniCurve: View {
             var center = Path(); center.move(to: CGPoint(x: 0, y: size.height / 2)); center.addLine(to: CGPoint(x: size.width, y: size.height / 2))
             context.stroke(center, with: .color(.gray.opacity(0.35)), lineWidth: 0.5)
             var curve = Path()
+            let response = ParametricEQ6Band.responseCurve(config: config, sampleRate: sampleRate, points: 81)
             for i in 0...80 {
-                let frequency = 20 * powf(1000, Float(i) / 80)
-                let db = ParametricEQ6Band.combinedResponseDB(config: config, freq: frequency, sampleRate: sampleRate)
+                let db = response[i]
                 let point = CGPoint(x: size.width * CGFloat(i) / 80, y: size.height * (0.5 - CGFloat(min(24, max(-24, db))) / 48))
                 if i == 0 { curve.move(to: point) } else { curve.addLine(to: point) }
             }

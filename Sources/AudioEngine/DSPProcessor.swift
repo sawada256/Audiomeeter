@@ -212,6 +212,20 @@ public final class ParametricEQ6Band {
         }
     }
 
+    /// Configure each filter once for an entire display curve, rather than per pixel.
+    public static func responseCurve(config: MasterEQConfig, sampleRate: Float, points: Int = 201) -> [Float] {
+        let filters = config.bands.filter { $0.isEnabled }.map { band -> BiquadFilter in
+            var filter = BiquadFilter()
+            filter.configure(type: band.type, sampleRate: sampleRate, freqHz: band.freqHz, gainDB: band.gainDB, q: band.q)
+            return filter
+        }
+        return (0..<max(2,points)).map { i in
+            let frequency = 20 * powf(1000,Float(i)/Float(max(2,points)-1))
+            let sum = filters.reduce(Float(0)) { $0 + $1.frequencyResponseDB(freq:frequency,sampleRate:sampleRate) }
+            return max(-30,min(30,sum))
+        }
+    }
+
     /// Calculate combined frequency response in dB across all 6 bands
     public static func combinedResponseDB(config: MasterEQConfig, freq: Float, sampleRate: Float = 48000.0) -> Float {
         var totalDB: Float = 0.0

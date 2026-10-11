@@ -148,6 +148,10 @@ public final class AppState: ObservableObject {
         }
     }
     private var appPollTimer: Timer?
+    private let appQueryQueue = DispatchQueue(label: "Audiomeeter.app-volume-query", qos: .utility)
+    private var appQueryInFlight = false
+    private var appTrimRevision = 0
+    private var isShuttingDown = false
     private let engine = AudiomeeterEngine.shared
     private let deviceManager = AudioDeviceManager.shared
 
@@ -792,9 +796,12 @@ extension AppState {
 
     private func updateInsertLatency() {
         for target in InsertTarget.all {
-            insertLatencies[target] = engine.insertLatency(target)
-            routeCompensation[target] = engine.compensationSamples(target: target)
-            for slot in engine.inserts[target] ?? [] { insertAlignmentDelays[slot.config.id] = slot.alignmentDelaySamples }
+            let latency = engine.insertLatency(target), compensation = engine.compensationSamples(target: target)
+            if insertLatencies[target] != latency { insertLatencies[target] = latency }
+            if routeCompensation[target] != compensation { routeCompensation[target] = compensation }
+            for slot in engine.inserts[target] ?? [] {
+                if insertAlignmentDelays[slot.config.id] != slot.alignmentDelaySamples { insertAlignmentDelays[slot.config.id] = slot.alignmentDelaySamples }
+            }
         }
     }
     public func setInsertSidechain(target: InsertTarget, id: UUID, strip: StripID?, bus: BusID? = nil) {
@@ -815,8 +822,9 @@ extension AppState {
         for target in InsertTarget.all {
             for slot in engine.inserts[target] ?? [] {
                 if slot.needsEditorRecovery { engine.withStoppedAudio { slot.recoverEditor() } }
-                slot.refresh(); insertStatus[slot.config.id] = slot.status
-                insertSideChannels[slot.config.id] = slot.sidechainChannels
+                slot.refresh()
+                if insertStatus[slot.config.id] != slot.status { insertStatus[slot.config.id] = slot.status }
+                if insertSideChannels[slot.config.id] != slot.sidechainChannels { insertSideChannels[slot.config.id] = slot.sidechainChannels }
                 if let index = insertConfigs[target]?.firstIndex(where: { $0.id == slot.config.id }), insertConfigs[target]?[index] != slot.config {
                     insertConfigs[target]?[index] = slot.config; changed = true
                 }
@@ -848,6 +856,7 @@ extension AppState {
     }
 
     public func shutdown() {
+        isShuttingDown = true
         if isStartingAudio { saveWork?.cancel(); writeSettings(); return }
         engine.stop()
         recorderPlayer.stopRecording()
@@ -868,9 +877,34 @@ extension AppState {
     }
 
     private func pollAppVolumes() {
-        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
-        var defaultID: AudioObjectID = 0, size = UInt32(MemoryLayout<AudioObjectID>.size)
-        if AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &defaultID) == noErr {
+        guard !appQueryInFlight, !isShuttingDown else { return }
+        appQueryInFlight = true
+        let revision = appTrimRevision
+        var requested: [StripID: (AudioDeviceID, String)] = [:]
+        for strip in [StripID.virtualVAIO, .virtualAUX] {
+            if let uid = strips[strip]?.deviceUID, let device = inputDevices.first(where: { $0.uid == uid }) {
+                requested[strip] = (device.id, uid)
+            }
+        }
+        // HAL queries may wait on IPC. Never run these periodic reads on the UI thread.
+        appQueryQueue.async { [weak self] in
+            var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+            var defaultID: AudioObjectID = 0, size = UInt32(MemoryLayout<AudioObjectID>.size)
+            let status = AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &defaultID)
+            var values: [StripID: Result<[VMAppClient], Error>] = [:]
+            for (strip, device) in requested { values[strip] = Result { try AppTrimTransport.read(device.0) } }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.appQueryInFlight = false
+                guard !self.isShuttingDown else { return }
+                guard self.appTrimRevision == revision else { self.pollAppVolumes(); return }
+                self.applyAppVolumes(defaultID: status == noErr ? defaultID : nil, values: values, requested: requested)
+            }
+        }
+    }
+
+    private func applyAppVolumes(defaultID: AudioObjectID?, values: [StripID: Result<[VMAppClient], Error>], requested: [StripID: (AudioDeviceID, String)]) {
+        if let defaultID {
             let uid = deviceManager.findDevice(byID: defaultID)?.uid
             let selected: StripID? = ["Audiomeeter_UID", "Voicemeeter_UID"].contains(uid) ? .virtualVAIO : ["AudiomeeterAUX_UID", "VoicemeeterAUX_UID"].contains(uid) ? .virtualAUX : nil
             if systemOutputStrip != selected { systemOutputStrip = selected }
@@ -880,9 +914,11 @@ extension AppState {
             var supported = false
             if let uid = strips[strip]?.deviceUID, let device = inputDevices.first(where: { $0.uid == uid }) {
                 do {
-                    let values = try AppTrimTransport.read(device.id)
+                    // Discard results for a device that changed while IPC was in flight.
+                    guard requested[strip]?.0 == device.id, requested[strip]?.1 == uid, let result = values[strip] else { continue }
+                    let values = try result.get()
                     supported = true
-                    appTrimErrors[strip] = nil
+                    if appTrimErrors[strip] != nil { appTrimErrors[strip] = nil }
                     var seen: Set<Int32> = []
                     for value in values where value.pid > 0 && value.pid != ProcessInfo.processInfo.processIdentifier {
                         guard seen.insert(value.pid).inserted else { continue }
@@ -893,11 +929,12 @@ extension AppState {
                         }
                         items.append(AppVolumeItem(pid: value.pid, name: app?.localizedName ?? "Process \(value.pid)", volume: gain))
                     }
-                } catch { appTrimErrors[strip] = error.localizedDescription }
+                } catch { if appTrimErrors[strip] != error.localizedDescription { appTrimErrors[strip] = error.localizedDescription } }
             } else {
-                appTrimErrors[strip] = L10n.text("VAIO／AUXにAudiomeeter専用デバイスを割り当ててください。")
+                let message = L10n.text("VAIO／AUXにAudiomeeter専用デバイスを割り当ててください。")
+                if appTrimErrors[strip] != message { appTrimErrors[strip] = message }
             }
-            appTrimSupported[strip] = supported
+            if appTrimSupported[strip] != supported { appTrimSupported[strip] = supported }
             items.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
             if strip == .virtualVAIO { if vaioAppVolumes != items { vaioAppVolumes = items } }
             else { if auxAppVolumes != items { auxAppVolumes = items } }
@@ -909,6 +946,9 @@ extension AppState {
         let value = VMAppClient(pid: pid, gain: max(0, min(2, gain)))
         let status = AppTrimTransport.set(device.id, pid: pid, gain: value.gain)
         guard status == noErr else { audioError = L10n.text("アプリのトリム変更に失敗しました (OSStatus {0})。", [String(describing: status)]); return }
+        appTrimRevision += 1
+        if strip == .virtualVAIO, let index = vaioAppVolumes.firstIndex(where: { $0.pid == pid }) { vaioAppVolumes[index].volume = value.gain }
+        if strip == .virtualAUX, let index = auxAppVolumes.firstIndex(where: { $0.pid == pid }) { auxAppVolumes[index].volume = value.gain }
         if let bundle = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier {
             savedAppTrims["\(strip.rawValue):\(bundle)"] = value.gain
             saveSettings()

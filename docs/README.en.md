@@ -19,3 +19,7 @@ EQ placement is before the INSERT group, after it / before LIMIT, or after LIMIT
 Build 6 overlays the spectrum on the restored 200 pt EQ plot, sharing its 20 Hz–20 kHz frequency axis. EQ gain is on the left; slope-adjusted spectrum levels are on the right. Response → Fast selects 2048-point FFT, 30 ms averaging and up to 60 fps. FFT, Avg and FPS remain individually adjustable; Avg 0 ms disables averaging. Shorter windows respond faster but reduce frequency resolution, especially in the bass.
 
 Build 7 increases the shared graph to 270 pt by using the remaining vertical space. On smaller screens, vertical scrolling keeps all controls accessible.
+
+## EQ spectrum rendering (build 8)
+
+Spectrum frames now pass through a latest-frame mailbox to a native CAShapeLayer, with Core Animation interpolation instead of per-frame SwiftUI notifications. FFT analysis continues to use Apple Accelerate/vDSP; no new third-party dependency is required. Periodic HAL app-list reads run on a serial background queue, with stale-result rejection and no overlapping requests. Unchanged state no longer triggers redundant UI notifications, and EQ response curves reuse filter coefficients. The visible v1 badge is removed; bundle metadata and Git retain version tracking.

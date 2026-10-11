@@ -110,6 +110,7 @@ public struct EQWindowView: View {
 
             // Frequency Response Graph (Logarithmic 20Hz - 20kHz, -18dB - +18dB)
             GeometryReader { geo in
+                let response = ParametricEQ6Band.responseCurve(config: config, sampleRate: Float(appState.engineSampleRate))
                 ZStack {
                     // Background & Grid
                     Rectangle()
@@ -154,8 +155,7 @@ public struct EQWindowView: View {
                         path.move(to: CGPoint(x: 0, y: zeroY))
                         for i in 0...steps {
                             let normX = Float(i) / Float(steps)
-                            let freq = xToFreq(CGFloat(normX) * geo.size.width, width: geo.size.width)
-                            let responseDB = ParametricEQ6Band.combinedResponseDB(config: config, freq: freq)
+                            let responseDB = response[i]
                             let y = dbToY(responseDB, height: geo.size.height)
                             path.addLine(to: CGPoint(x: CGFloat(normX) * geo.size.width, y: y))
                         }
@@ -175,8 +175,7 @@ public struct EQWindowView: View {
                         let steps = 200
                         for i in 0...steps {
                             let normX = Float(i) / Float(steps)
-                            let freq = xToFreq(CGFloat(normX) * geo.size.width, width: geo.size.width)
-                            let responseDB = ParametricEQ6Band.combinedResponseDB(config: config, freq: freq)
+                            let responseDB = response[i]
                             let y = dbToY(responseDB, height: geo.size.height)
                             let pt = CGPoint(x: CGFloat(normX) * geo.size.width, y: y)
 

@@ -1,16 +1,20 @@
 import SwiftUI
+import AppKit
+import QuartzCore
 
-@MainActor final class SpectrumModel: ObservableObject {
-    @Published var bins = [Float](repeating:-120,count:256)
+@MainActor final class SpectrumModel {
+    let frames = SpectrumFrameMailbox()
     private let queue = DispatchQueue(label:"Audiomeeter.spectrum",qos:.utility)
     private var timer: DispatchSourceTimer?
     private var generation = 0
     func stop(_ capture: SpectrumCapture) {
-        capture.select(nil); timer?.cancel(); timer = nil; generation += 1
+        capture.select(nil); timer?.cancel(); timer = nil; generation += 1; frames.invalidate()
     }
     func start(capture: SpectrumCapture, bus: BusID, size: Int, window: SpectrumWindow, average: Float, slope: Float, smoothing: Float, fps: Int) {
         stop(capture)
         let token = generation
+        let mailbox = frames
+        let frameToken = mailbox.invalidate()
         let timer = DispatchSource.makeTimerSource(queue:queue)
         self.timer = timer
         // All mutable FFT/history state belongs exclusively to this serial queue.
@@ -28,7 +32,8 @@ import SwiftUI
                 capture.select(bus)
             }
         }
-        timer.setEventHandler { [weak self] in
+        var lastPublished = [Float]()
+        timer.setEventHandler {
             let count = capture.ring.read(into:scratch,frameCount:32768)
             if count > 0 { pending.append(contentsOf:UnsafeBufferPointer(start:scratch,count:count*2)) }
             let rate = capture.sampleRate
@@ -47,9 +52,9 @@ import SwiftUI
             }
             guard processed else { return }
             let bins = SpectrumFFT.display(averaged,rate:rate,size:size,slope:slope,smoothing:smoothing)
-            Task { @MainActor [weak self] in
-                guard let self, self.generation == token else { return }
-                self.bins = bins
+            if bins != lastPublished {
+                mailbox.publish(bins, generation: frameToken)
+                lastPublished = bins
             }
         }
         timer.schedule(deadline:.now(),repeating:1.0/Double(fps),leeway:.milliseconds(fps >= 60 ? 2 : 8))
@@ -105,17 +110,67 @@ struct SpectrumAnalyzerView<Content: View>: View {
         content(model, enabled)
     }
 }
-struct SpectrumPlot: View {
-    @ObservedObject var model: SpectrumModel
-    var body: some View {
-        Canvas(rendersAsynchronously: true) { context,size in
-            var curve = Path()
-            for i in model.bins.indices {
-                let p = CGPoint(x:size.width*CGFloat(i)/255,y:size.height*CGFloat(min(100,max(0,-model.bins[i])))/100)
-                if i == 0 { curve.move(to:p) } else { curve.addLine(to:p) }
-            }
-            context.stroke(curve,with:.color(.green.opacity(0.75)),lineWidth:1)
+/// Native layer updates avoid invalidating the SwiftUI EQ/control tree for every FFT frame.
+struct SpectrumPlot: NSViewRepresentable {
+    let model: SpectrumModel
+    func makeNSView(context: Context) -> SpectrumLayerView { SpectrumLayerView(frames: model.frames) }
+    func updateNSView(_ view: SpectrumLayerView, context: Context) { view.frames = model.frames }
+    static func dismantleNSView(_ view: SpectrumLayerView, coordinator: ()) { view.stop() }
+}
+final class SpectrumLayerView: NSView {
+    var frames: SpectrumFrameMailbox
+    private let curve = CAShapeLayer()
+    private var timer: Timer?
+    private var bins = [Float]()
+    private var lastUpdate: CFTimeInterval = 0
+    init(frames: SpectrumFrameMailbox) {
+        self.frames = frames
+        super.init(frame: .zero)
+        wantsLayer = true
+        curve.strokeColor = NSColor.systemGreen.withAlphaComponent(0.75).cgColor
+        curve.fillColor = nil; curve.lineWidth = 1
+        layer?.addSublayer(curve)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        stop()
+        guard window != nil else { return }
+        let timer = Timer(timeInterval: 1.0/60, repeats: true) { [weak self] _ in self?.displayNewestFrame() }
+        RunLoop.main.add(timer, forMode: .common); self.timer = timer
+    }
+    func stop() { timer?.invalidate(); timer = nil }
+    private func path() -> CGPath {
+        let result = CGMutablePath()
+        for i in bins.indices {
+            let point = CGPoint(x: bounds.width * CGFloat(i) / CGFloat(max(1,bins.count-1)),
+                                y: bounds.height * (1-CGFloat(min(100,max(0,-bins[i])))/100))
+            if i == 0 { result.move(to: point) } else { result.addLine(to: point) }
         }
+        return result
+    }
+    override func layout() {
+        super.layout()
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        curve.frame = bounds; curve.path = path()
+        CATransaction.commit()
+    }
+    private func displayNewestFrame() {
+        guard window?.occlusionState.contains(.visible) == true, let newest = frames.take() else { return }
+        bins = newest
+        let now = CACurrentMediaTime()
+        let from = curve.presentation()?.path ?? curve.path
+        let next = path()
+        CATransaction.begin(); CATransaction.setDisableActions(true); curve.path = next; CATransaction.commit()
+        if let from, !from.isEmpty {
+            let animation = CABasicAnimation(keyPath: "path")
+            animation.fromValue = from; animation.toValue = next
+            animation.duration = now-lastUpdate > 0.25 ? 1.0/60 : min(0.10,max(1.0/60,now-lastUpdate))
+            animation.timingFunction = CAMediaTimingFunction(name: .linear)
+            curve.add(animation, forKey: "spectrum")
+        }
+        lastUpdate = now
     }
 }
 struct SpectrumAxis: View {

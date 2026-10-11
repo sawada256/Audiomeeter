@@ -74,3 +74,23 @@ final class SpectrumFFT {
         }
     }
 }
+
+/// Single-slot display mailbox. Never touched by the real-time audio callback.
+/// Slow UI consumers receive only the newest frame; obsolete sessions cannot publish.
+final class SpectrumFrameMailbox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var generation = 0
+    private var frame: [Float]?
+    @discardableResult func invalidate() -> Int {
+        lock.lock(); defer { lock.unlock() }
+        generation += 1; frame = nil; return generation
+    }
+    func publish(_ values: [Float], generation token: Int) {
+        lock.lock(); defer { lock.unlock() }
+        if token == generation { frame = values }
+    }
+    func take() -> [Float]? {
+        lock.lock(); defer { lock.unlock() }
+        let result = frame; frame = nil; return result
+    }
+}

@@ -49,7 +49,9 @@ import Foundation
         padEngine.updateStripSettings(strip: .hardware1) { $0.routing = RoutingMatrix(a1: true); $0.padMode = .pitch }
         padEngine.updateBusSettings(bus: .A1) { $0.isLimiterEnabled = false }
         var impulse = [Float](repeating:0,count:1024); impulse[0] = 0.1; impulse[1] = 0.1
-        padEngine.feedOffline(.hardware1, impulse)
+        // Input playback deliberately waits for a three-block clock reserve.
+        // Prime it before measuring the PAD's own delay, rather than measuring silence.
+        padEngine.feedOffline(.hardware1, impulse + [Float](repeating:0,count:2048))
         let padOutput = padEngine.renderOffline()[.A1]!
         let peak = stride(from:0,to:padOutput.count,by:2).max(by: { abs(padOutput[$0]) < abs(padOutput[$1]) })!
         precondition(peak/2 == 482, "Pitch PAD nominal delay must reach mixer output")
