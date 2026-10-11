@@ -80,7 +80,8 @@ public struct SingleBusStripView: View {
                 DualActionButton(title: "INSERT · \(slots.count)", isActive: appState.insertChainIsEnabled(.bus(busID)),
                                  onLeftClick: { appState.toggleInsertChain(.bus(busID)) }, onRightClick: { showInserts = true }, fontSize: 8)
                     .frame(height: 20)
-                ScrollView(.vertical, showsIndicators: slots.count > 3) {
+                GeometryReader { viewport in
+                ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 2) {
                         if slots.isEmpty { Text("—").font(VMTheme.fontSmall).foregroundStyle(.secondary).frame(height: 16) }
                         ForEach(pre, id: \.id) { insertRow($0) }
@@ -97,7 +98,11 @@ public struct SingleBusStripView: View {
                             }
                             ForEach(post, id: \.id) { insertRow($0) }
                         }
-                    }.padding(.horizontal, 2)
+                    }
+                    // Native buttons must use the viewport width, never the longest plugin title.
+                    .frame(width: max(0, viewport.size.width - 4))
+                    .padding(.horizontal, 2)
+                }.frame(width: viewport.size.width).clipped()
                 }.frame(height: hasPost ? 64 : 52)
             }.background(VMTheme.textAccent.opacity(0.07))
                 .overlay(RoundedRectangle(cornerRadius: 3).stroke(VMTheme.textAccent.opacity(0.22), lineWidth: 1))
@@ -247,6 +252,10 @@ struct DualActionButton: NSViewRepresentable {
     var fontSize: CGFloat = 10
     var activeColor: NSColor = .systemCyan
     func makeNSView(context: Context) -> ActionButton { ActionButton() }
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ActionButton, context: Context) -> CGSize? {
+        guard let width = proposal.width else { return nil }
+        return CGSize(width: width, height: proposal.height ?? 20)
+    }
     func updateNSView(_ view: ActionButton, context: Context) {
         view.cell?.lineBreakMode = .byTruncatingTail
         view.title = title; view.left = onLeftClick; view.right = onRightClick
