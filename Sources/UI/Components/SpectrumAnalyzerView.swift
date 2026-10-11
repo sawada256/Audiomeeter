@@ -196,7 +196,7 @@ struct SpectrumAxis: View {
             ForEach(0..<4,id:\.self) { tick in
                 let db = Int(topDB-rangeDB*Double(tick)/3)
                 Text("\(db)").font(.system(size:9,design:.monospaced)).foregroundStyle(.green.opacity(0.8))
-                    .position(x:22,y:max(10,geo.size.height*CGFloat(tick)/3))
+                    .position(x:22,y:max(10,min(geo.size.height-22,geo.size.height*CGFloat(tick)/3)))
             }
             Text("dB*").font(.system(size:8)).foregroundStyle(.green.opacity(0.8)).position(x:22,y:geo.size.height-8)
         }.frame(width:44).help(L10n.text("スペクトラムの表示値（Slope補正後）。EQゲインとは別の軸です。"))

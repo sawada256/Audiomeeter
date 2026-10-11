@@ -549,6 +549,12 @@ public final class AppState: ObservableObject {
         saveSettings()
     }
 
+    // Interactive EQ preview avoids publishing the entire mixer or scheduling disk saves.
+    // The editor commits through setBusEQConfig when the drag ends.
+    func previewBusEQConfig(bus: BusID, config: MasterEQConfig) {
+        engine.updateBusSettings(bus: bus) { $0.eqConfig = config }
+    }
+
     public func setBusEQBand(bus: BusID, bandIndex: Int, type: FilterType? = nil, freqHz: Float? = nil, gainDB: Float? = nil, q: Float? = nil, isEnabled: Bool? = nil) {
         guard var b = buses[bus], bandIndex >= 0, bandIndex < b.eqConfig.bands.count else { return }
         if let t = type { b.eqConfig.bands[bandIndex].type = t }

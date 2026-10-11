@@ -29,3 +29,5 @@ Spectrum frames now pass through a latest-frame mailbox to a native CAShapeLayer
 Spectrum Top selects the upper display level (−60 to +24 dB); Range selects a 40/60/80/100/120 dB span. Auto fits the latest displayed peak with at least 6 dB of headroom in 12 dB steps, preserving the span. This changes only the spectrum scale.
 
 Right-click LIMIT to select Lookahead OFF/1/3/5/10/20 ms. OFF preserves legacy zero-latency soft-knee waveshaping. ON adds the selected delay and uses linked stereo sliding-peak gain control with a 50 ms release. This is sample-peak limiting, not true-peak processing. Delay participates in existing route/output alignment; mode changes reset history and may briefly interrupt audio. Default remains OFF.
+
+Build 10 keeps EQ curve drags local to the editor and previews audio at up to 60 Hz, committing shared settings only on release or dismissal. Spectrum capture, FFT and display timers stop when the EQ editor closes, even if its saved spectrum preference is ON.

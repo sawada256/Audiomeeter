@@ -6,9 +6,27 @@ public struct EQWindowView: View {
     let onClose: () -> Void
 
     @State private var selectedBandIndex: Int = 0
+    @State private var dragConfig: MasterEQConfig?
+    @State private var lastDragUpdate: TimeInterval = 0
 
     private var config: MasterEQConfig {
-        appState.buses[bus]?.eqConfig ?? MasterEQConfig()
+        dragConfig ?? appState.buses[bus]?.eqConfig ?? MasterEQConfig()
+    }
+
+    private func previewDrag(_ index: Int, location: CGPoint, size: CGSize) {
+        if selectedBandIndex != index { selectedBandIndex = index }
+        var next = config
+        guard next.bands.indices.contains(index) else { return }
+        next.bands[index].freqHz = xToFreq(location.x, width: size.width)
+        next.bands[index].gainDB = yToDB(location.y, height: size.height)
+        dragConfig = next
+        appState.previewBusEQConfig(bus: bus, config: next)
+    }
+
+    private func finishDrag() {
+        guard let next = dragConfig else { return }
+        appState.setBusEQConfig(bus: bus, config: next)
+        dragConfig = nil; lastDragUpdate = 0
     }
 
     private func hasPreset(_ slot: Int) -> Bool {
@@ -216,10 +234,15 @@ public struct EQWindowView: View {
                         .gesture(
                             DragGesture(minimumDistance: 1)
                                 .onChanged { val in
-                                    selectedBandIndex = idx
-                                    let newFreq = xToFreq(val.location.x, width: geo.size.width)
-                                    let newGain = yToDB(val.location.y, height: geo.size.height)
-                                    appState.setBusEQBand(bus: bus, bandIndex: idx, freqHz: newFreq, gainDB: newGain)
+                                    let now = ProcessInfo.processInfo.systemUptime
+                                    guard now-lastDragUpdate >= 1.0/60 else { return }
+                                    lastDragUpdate = now
+                                    previewDrag(idx, location: val.location, size: geo.size)
+                                }
+                                .onEnded { val in
+                                    // Commit the exact release point, including any throttled last event.
+                                    previewDrag(idx, location: val.location, size: geo.size)
+                                    finishDrag()
                                 }
                         )
                         .onTapGesture {
@@ -231,6 +254,7 @@ public struct EQWindowView: View {
             .padding(.trailing,44)
             .overlay(alignment:.trailing) { if spectrumEnabled { SpectrumAxis().allowsHitTesting(false) } }
             .frame(height: 270)
+            .onDisappear { finishDrag() }
             }, capture: appState.spectrumCapture, bus: bus)
 
             Divider().background(VMTheme.panelBorder)
