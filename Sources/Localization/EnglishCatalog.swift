@@ -9,6 +9,7 @@ enum EnglishCatalog {
     "信号順序": "Signal Order",
     "出力バスの信号順序（全バス共通）": "Output Bus Signal Order (All Buses)",
     "PRE → FADER → POSTの関係を保ち、EQとLIMITを移動できます。変更時は音声が一時停止します。": "Move EQ and LIMIT while preserving PRE → FADER → POST. Audio briefly stops when changing the order.",
+    "先読みOFFはソフトニー波形制限。ONは左右連動のピーク検出と50 msリリースで音量を制御します。指定時間の遅延が加わります。True Peak制限ではありません。": "Lookahead OFF uses soft-knee waveshaping. ON uses linked stereo peak detection and a 50 ms release. It adds the selected delay. This is not a true-peak limiter.",
     "先読みなしのソフトニー制限。Thresholdから圧縮し、Ceilingを超えないようにします。": "Zero-lookahead soft-knee limiting starts at Threshold and stays below Ceiling.",
     "ミキサーを表示": "Show Mixer",
     "VST3エフェクトを選択": "Choose a VST3 Effect",

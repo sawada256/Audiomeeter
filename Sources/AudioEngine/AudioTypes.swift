@@ -356,6 +356,7 @@ public struct BusSettings: Codable, Equatable {
     public var delayMilliseconds: Double? = nil // Additional device calibration after plugin PDC.
     public var limiterThresholdDB: Float? = nil
     public var limiterCeilingDB: Float? = nil
+    public var limiterLookaheadMS: Double? = nil
     public var isLimiterEnabled: Bool? = true // nil preserves legacy settings
 
     public init(

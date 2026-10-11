@@ -23,3 +23,9 @@ Build 7 increases the shared graph to 270 pt by using the remaining vertical spa
 ## EQ spectrum rendering (build 8)
 
 Spectrum frames now pass through a latest-frame mailbox to a native CAShapeLayer, with Core Animation interpolation instead of per-frame SwiftUI notifications. FFT analysis continues to use Apple Accelerate/vDSP; no new third-party dependency is required. Periodic HAL app-list reads run on a serial background queue, with stale-result rejection and no overlapping requests. Unchanged state no longer triggers redundant UI notifications, and EQ response curves reuse filter coefficients. The visible v1 badge is removed; bundle metadata and Git retain version tracking.
+
+## Spectrum range and limiter lookahead (build 9)
+
+Spectrum Top selects the upper display level (−60 to +24 dB); Range selects a 40/60/80/100/120 dB span. Auto fits the latest displayed peak with at least 6 dB of headroom in 12 dB steps, preserving the span. This changes only the spectrum scale.
+
+Right-click LIMIT to select Lookahead OFF/1/3/5/10/20 ms. OFF preserves legacy zero-latency soft-knee waveshaping. ON adds the selected delay and uses linked stereo sliding-peak gain control with a 50 ms release. This is sample-peak limiting, not true-peak processing. Delay participates in existing route/output alignment; mode changes reset history and may briefly interrupt audio. Default remains OFF.

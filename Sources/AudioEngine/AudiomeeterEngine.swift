@@ -660,7 +660,8 @@ public final class AudiomeeterEngine {
                     case .limiter:
                         dsp.processLimiter(buffer: bBuf, frames: clampedFrames, sampleRate: Float(engineSampleRate),
                                            enabled: setting.isLimiterEnabled ?? true, thresholdDB: setting.limiterThresholdDB ?? -0.91515,
-                                           ceilingDB: setting.limiterCeilingDB ?? 0)
+                                           ceilingDB: setting.limiterCeilingDB ?? 0, lookaheadMS: setting.limiterLookaheadMS ?? 0)
+                        processedLatency += BusDSP.limiterLatency(sampleRate: Float(engineSampleRate), milliseconds: setting.limiterLookaheadMS ?? 0, enabled: setting.isLimiterEnabled ?? true)
                     }
                 }
                 let manualDelay = Int(min(500, max(0, setting.delayMilliseconds ?? 0)) * engineSampleRate / 1000)

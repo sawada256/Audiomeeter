@@ -505,6 +505,12 @@ public final class AppState: ObservableObject {
         saveSettings()
     }
 
+    func setLimiterLookahead(bus: BusID, milliseconds: Double) {
+        let value = milliseconds.isFinite ? min(20,max(0,milliseconds)) : 0
+        buses[bus]?.limiterLookaheadMS = value
+        engine.updateBusSettings(bus: bus) { $0.limiterLookaheadMS = value }
+        saveSettings()
+    }
     public func setBusLimiter(bus: BusID, enabled: Bool) {
         buses[bus]?.isLimiterEnabled = enabled
         engine.updateBusSettings(bus: bus) { $0.isLimiterEnabled = enabled }

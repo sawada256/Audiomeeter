@@ -477,12 +477,27 @@ public final class BusDSP {
 
     public private(set) var limiterReductionDB: Float = 0
     private var limiterHoldFrames = 0
+    private let lookaheadCapacity = 8192
+    private var lookaheadAudio = [Float](repeating:0,count:16384)
+    private var peakValues = [Float](repeating:0,count:8192)
+    private var peakTimes = [Int64](repeating:0,count:8192)
+    private var peakHead = 0, peakTail = 0, lookaheadFrames = 0
+    private var lookaheadTime: Int64 = 0
+    private var lookaheadGain: Float = 1
+    public static func limiterLatency(sampleRate: Float, milliseconds: Double, enabled: Bool = true) -> Int {
+        guard enabled, milliseconds.isFinite else { return 0 }
+        return min(8190,max(0,Int(Double(sampleRate)*min(20,max(0,milliseconds))/1000)))
+    }
+    private func resetLookahead(_ frames: Int) {
+        lookaheadFrames = frames; lookaheadTime = 0; peakHead = 0; peakTail = 0; lookaheadGain = 1
+        for i in lookaheadAudio.indices { lookaheadAudio[i] = 0 }
+    }
 
     public init() {}
 
     public func reset() {
         limiterReductionDB = 0; limiterHoldFrames = 0
-        eq.reset()
+        eq.reset(); resetLookahead(0)
     }
 
     public func process(
@@ -541,13 +556,39 @@ public final class BusDSP {
 
     /// Zero-lookahead soft knee, preserving the original transfer curve by default.
     public func processLimiter(buffer: UnsafeMutablePointer<Float>, frames: Int, sampleRate: Float,
-                               enabled: Bool = true, thresholdDB: Float = -0.91515, ceilingDB: Float = 0) {
+                               enabled: Bool = true, thresholdDB: Float = -0.91515, ceilingDB: Float = 0, lookaheadMS: Double = 0) {
+        let delay = Self.limiterLatency(sampleRate: sampleRate, milliseconds: lookaheadMS, enabled: enabled)
+        if delay != lookaheadFrames { resetLookahead(delay) }
         guard enabled else { limiterReductionDB = 0; limiterHoldFrames = 0; return }
         let ceiling = powf(10, min(0, max(-24, ceilingDB.isFinite ? ceilingDB : 0)) / 20)
         let threshold = min(ceiling, powf(10, min(0, max(-36, thresholdDB.isFinite ? thresholdDB : -0.91515)) / 20))
         let knee = max(0.000001, ceiling - threshold)
         var maximumRatio: Float = 1
-        for i in 0..<(frames * 2) {
+        if delay > 0 {
+            let release = expf(-1 / max(1,sampleRate*0.05))
+            for i in 0..<frames {
+                let time = lookaheadTime, index = Int(time % Int64(lookaheadCapacity))
+                let l = buffer[i*2].isFinite ? buffer[i*2] : 0, r = buffer[i*2+1].isFinite ? buffer[i*2+1] : 0
+                lookaheadAudio[index*2] = l; lookaheadAudio[index*2+1] = r
+                let peak = max(abs(l),abs(r))
+                while peakHead != peakTail && peakTimes[peakHead] < time-Int64(delay) { peakHead = (peakHead+1)%lookaheadCapacity }
+                while peakHead != peakTail {
+                    let previous = (peakTail+lookaheadCapacity-1)%lookaheadCapacity
+                    if peakValues[previous] > peak { break }
+                    peakTail = previous
+                }
+                peakValues[peakTail] = peak; peakTimes[peakTail] = time; peakTail = (peakTail+1)%lookaheadCapacity
+                let maximum = peakValues[peakHead]
+                let limited = maximum > threshold ? min(ceiling,threshold+knee*tanhf((maximum-threshold)/knee)) : maximum
+                let target = maximum > 0 ? limited/maximum : 1
+                lookaheadGain = target < lookaheadGain ? target : release*lookaheadGain+(1-release)*target
+                let read = Int((time-Int64(delay)+Int64(lookaheadCapacity))%Int64(lookaheadCapacity))
+                buffer[i*2] = lookaheadAudio[read*2]*lookaheadGain
+                buffer[i*2+1] = lookaheadAudio[read*2+1]*lookaheadGain
+                maximumRatio = max(maximumRatio,1/max(0.000001,lookaheadGain))
+                lookaheadTime += 1
+            }
+        } else { for i in 0..<(frames * 2) {
             let input = buffer[i]
             guard input.isFinite else { buffer[i] = 0; continue }
             let magnitude = abs(input)
@@ -556,6 +597,7 @@ public final class BusDSP {
                 buffer[i] = copysignf(output, input)
                 maximumRatio = max(maximumRatio, magnitude / max(0.000001, output))
             }
+        }
         }
         let reduction = 20 * log10f(maximumRatio)
         if reduction > 0.001 {

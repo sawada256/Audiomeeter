@@ -194,8 +194,12 @@ struct LimiterSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("\(bus.name) · LIMIT").font(.headline)
-            Text(L10n.text("先読みなしのソフトニー制限。Thresholdから圧縮し、Ceilingを超えないようにします。"))
+            Text(L10n.text("先読みOFFはソフトニー波形制限。ONは左右連動のピーク検出と50 msリリースで音量を制御します。指定時間の遅延が加わります。True Peak制限ではありません。"))
                 .font(.caption)
+            Picker("Lookahead", selection: Binding(get: { settings.limiterLookaheadMS ?? 0 }, set: { appState.setLimiterLookahead(bus: bus, milliseconds: $0) })) {
+                Text("Off · 0 ms").tag(0.0)
+                ForEach([1.0,3,5,10,20],id:\.self) { Text("\(Int($0)) ms").tag($0) }
+            }
             HStack {
                 Text("Threshold").frame(width: 80)
                 Slider(value: Binding(get: { settings.limiterThresholdDB ?? -0.91515 }, set: { appState.setLimiterValues(bus: bus, threshold: $0, ceiling: settings.limiterCeilingDB ?? 0) }), in: -36...0)
