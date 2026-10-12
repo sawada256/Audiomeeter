@@ -1,9 +1,15 @@
-# Git管理
+[日本語](DEVELOPMENT.ja.md) | [English](DEVELOPMENT.en.md) · [Home](../README.md)
 
-Audiomeeterが今後のv1開発の正本です。旧Voicemeeter-Macリポジトリは個人用の既存環境として残します。
+# 開発・Git管理
 
-変更は関連する検証後、まとまりごとにローカルコミットしてください。`AGENTS.md`にも同じ指示があります。未コミット差分まで自動で永続化する仕組みではありません。作業の終わりに`git status`で記録漏れを確認します。
+正本はこのAudiomeeterリポジトリです。GitHubは `sawada256/Audiomeeter` の非公開リポジトリとして管理します。旧Voicemeeter-Macは別リポジトリのままです。
 
-`.build`、`.app`、`.driver`、ログ、録音、ユーザー設定、証明書・秘密鍵は除外します。テスト、ビルド・導入スクリプト、ライセンス表示、ドキュメントは再現性と保守のため追跡します。
+```sh
+./build_app.sh
+./Tests/run_audio_tests.sh
+python3 Tools/check_repository.py
+```
 
-リモートは未設定です。`v1.0.0`タグはローカル開発基準点であり、そのまま公開許諾が完了したことを意味しません。外部push・GitHub公開は明示的に依頼されるまで行わないでください。
+Command Line Tools、CMake 3.22以降、Python 3が必要です。JUCE 8.0.12は固定コミットから取得します。変更は適切な検証後にまとまり単位でコミットします。生成アプリ／HAL、録音、設定、ログ、署名鍵はコミットしません。コミット前に `git diff --check` と `git status` を確認します。
+
+私有リポジトリへのpushと一般公開・Release公開は別の操作です。公開範囲変更やRelease公開は所有者の明示的な指示で行います。既存のv1.0.0タグは初期開発基準点で、最新版Releaseを示しません。配布版は確認済みコミットから新たなタグを作成し、そのコミットで資材を生成してください。

@@ -1,25 +1,38 @@
+[日本語](INSTALL.ja.md) | [English](INSTALL.en.md) · [Home](../README.md)
+
 # Installation
 
-Requires Apple Silicon, macOS 14+, Xcode Command Line Tools, Git, CMake 3.22+, and Python 3. Internet access is needed for the first pinned JUCE checkout.
+## Requirements and packages
 
-Build with `./build_app.sh`, then open `Audiomeeter.app`. Quit it before running `./install_app.sh` to install under `/Applications`; a previous Audiomeeter app is backed up. The existing legacy Voicemeeter app/settings are not migrated or replaced.
+Apple Silicon, macOS 14+. Packages require no build tools. Quit Audiomeeter and other audio apps, then open `Audiomeeter-App-*.pkg` and, if needed, `Audiomeeter-Drivers-*.pkg`, authorizing with an administrator account. Driver installation restarts Core Audio and briefly interrupts system-wide audio.
 
-For dedicated virtual endpoints, quit audio apps and run `./install_drivers.sh`. This requests administrator authorization, installs four Audiomeeter HAL bundles, and restarts Core Audio, briefly interrupting system audio. Existing Voicemeeter/BlackHole drivers are left alone.
+Current `LOCAL-UNSIGNED` artifacts have no installer signature or notarization. If blocked, verify their trusted origin/hash, then use Open Anyway in System Settings → Privacy & Security when available. OS versions and managed-device policies may prevent overrides. Stop on malware/damage warnings. Do not disable Gatekeeper globally. See [Apple's instructions](https://support.apple.com/en-us/102445). Clean-machine package installation still needs final testing.
 
-Grant microphone access on launch. Accessibility permission is needed only for media volume key capture. Login-at-startup may also require approval in System Settings. Development/ad-hoc builds are not notarized public releases. Use the same signing identity for updates; ad-hoc builds or changed identities may require renewed permissions.
+Targets are `/Applications/Audiomeeter.app` and four Audiomeeter bundles in `/Library/Audio/Plug-Ins/HAL/`. Existing Audiomeeter files are backed up in `/Library/Application Support/Audiomeeter/InstallerBackups/`. Legacy Voicemeeter, BlackHole and other HALs remain intact. Failure recovery may require manual backup restoration.
 
-Select a physical A1 output, Audiomeeter for VAIO, and Audiomeeter AUX for AUX. Set system sound output to Audiomeeter and route VAIO to A1. DAWs selecting Audiomeeter receive B1 and play into VAIO; avoid feedback by leaving VAIO → B1 off when monitoring that capture.
+## Source-install fallback
 
-Recordings: `~/Music/AudiomeeterRecordings`. Settings/catalog: `~/Library/Application Support/Audiomeeter`. Choose English in Audio Settings → 言語 / Language.
+The repository includes installation scripts. Requires Command Line Tools, Git, CMake 3.22+, Python 3 and the macOS SDK. Install CMake/Python from their official distribution or your preferred package manager.
 
-To uninstall, quit the app and move it to Trash. Remove/backup only the four Audiomeeter `.driver` bundles from `/Library/Audio/Plug-Ins/HAL` with administrator rights, then restart macOS. Preserve other vendors' drivers and your recordings. App/driver backups live in `.build/installation-backup`.
+```sh
+xcode-select --install
+git clone https://github.com/sawada256/Audiomeeter.git
+cd Audiomeeter
+./install_app.sh
+./install_drivers.sh
+open /Applications/Audiomeeter.app
+```
 
-Run `./Tests/run_audio_tests.sh` for offline verification. Optional live HAL tests require exclusive access and can interrupt audio; read the script before enabling them.
+Cloning the private repository requires its owner or an invited account. Alternatively extract the corresponding-source tar.gz and run the final three commands there. Our source tar.gz includes pinned JUCE; GitHub's automatic Source code archives do not. A normal clone downloads JUCE on its first build.
 
-## Installer packages
+These scripts build from source, not a portable installation without developer tools. The app installer creates a backup. The driver installer requests administrator rights and replaces only four Audiomeeter HALs. Source-install backups live in `.build/installation-backup/`. Use a consistent signing identity for updates; ad-hoc signing or identity changes can require renewed permissions.
 
-Open the separate Audiomeeter-App and Audiomeeter-Drivers packages on Apple Silicon/macOS 14+. End users do not need build tools. Quit the mixer and audio apps first; driver installation restarts Core Audio. Existing Audiomeeter files are backed up under `/Library/Application Support/Audiomeeter/InstallerBackups/`. Other products and user data are preserved. Recovery after an installation failure may require restoring those backups manually.
+## First launch and permissions
 
-LOCAL-UNSIGNED packages are local test artifacts, not notarized public releases. Do not disable Gatekeeper to deploy them. Public release requires Developer ID signing and notarization.
+Allow microphone access. Media-key capture needs Accessibility permission for Audiomeeter itself; launch at login may require OS approval. Select hardware output A1 and Audiomeeter VAIO/AUX inputs. Legacy selections are not automatically migrated: reselect devices in macOS and your DAW. See [first sound and DAW routing](USAGE.en.md).
 
-Select Audiomeeter VAIO, Audiomeeter AUX, Audiomeeter B1 and Audiomeeter B2 in the mixer, macOS and DAW. Legacy drivers remain installed; switch selections manually when migrating. Audiomeeter UIDs remain stable.
+Settings live in `~/Library/Application Support/Audiomeeter`; recordings in `~/Music/AudiomeeterRecordings`. Updates preserve these. Japanese is the default; select English in Audio Settings → 言語 / Language.
+
+## Removal and recovery
+
+Quit and move the app to Trash. With administrator rights, move only Audiomeeter.driver, AudiomeeterAUX.driver, AudiomeeterB1.driver and AudiomeeterB2.driver out of the HAL directory, then restart macOS. Preserve legacy/other-vendor files. Restore saved app/HAL bundles to their original locations for recovery, checking ownership/permissions as administrator before rebooting. Back up settings and recordings separately as needed.

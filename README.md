@@ -1,35 +1,22 @@
+[日本語](README.md) | [English](README.en.md)
+
 # Audiomeeter
 
-[入力PAD・スペアナ](docs/PADS_SPECTRUM.ja.md) · [出力バスの操作・処理順](docs/OUTPUT_BUS.ja.md) · [English](docs/README.en.md) · [インストール](docs/INSTALL.ja.md) · [検証・既知の課題](docs/AUDIT.ja.md) · [ライセンス整理](docs/LICENSING.ja.md)
+Apple Silicon / macOS 14以降向けステレオミキサー。非公開開発版で、未公証のテスト用インストーラーを用意しています。VB-Audioとは独立した実装で、公式製品ではありません。
 
-Apple Silicon / macOS 14以降向けのステレオ音声ミキサー。現在は公開準備中のローカル開発版です。VB-Audio製品とは独立した実装であり、同社の公式製品・互換製品ではありません。
+[導入](docs/INSTALL.ja.md) · [使い方](docs/USAGE.ja.md) · [本家との違い](docs/COMPARISON.ja.md) · [EQ・PAD](docs/PADS_SPECTRUM.ja.md) · [出力バス](docs/OUTPUT_BUS.ja.md) · [Release](docs/DISTRIBUTION.ja.md) · [ライセンス](docs/LICENSING.ja.md) · [既知の課題](docs/AUDIT.ja.md) · [開発](docs/DEVELOPMENT.ja.md)
 
 ## 機能
 
-- 物理入力3系統、仮想入力VAIO/AUX、出力A1–A3/B1/B2のルーティング。
-- フェーダー、ミュート、ソロ、ステレオPAN、EQとプリセット、ダイナミクス。
-- 物理入力の切替式PAN／音色／モジュレーション／ピッチ／試験用FORMANT PAD、ON/OFF式EQスペアナ。
-- デバイスが公開するチャンネル数に応じた左右の物理チャンネル選択。
-- ARM64 VST3エフェクトのプロセス分離、入力／出力のPRE/POSTインサート、サイドチェイン、遅延補正。
-- 専用HALドライバーによる仮想デバイス、VAIO/B1・AUX/B2の全二重接続、アプリ別トリム。
-- レコーダー／プレーヤー、録音ソースメーター、Finderでの録音表示。
-- 音量キー／カスタムホットキー、常駐ミニミキサー、1.5秒の操作時表示。
-- 日本語（初期値）／英語。オーディオ設定の「言語 / Language」で切り替え。
+- 物理3＋VAIO/AUX入力、A1–A3/B1/B2、左右チャンネル指定、PAN/EQ/ダイナミクス。
+- ARM64 VST3のPRE/POSTインサート、別プロセス処理、サイドチェインと遅延補正。
+- 専用HALによるVAIO/B1・AUX/B2の全二重とアプリ別trim。
+- EQプリセット・重ね表示スペアナ、切替式入力PAD（試験Formantを含む）。
+- 録音・再生、ホットキー、常駐ミニミキサー、自動復帰・ログイン時起動。
+- 日本語（既定）／英語切替。OS・第三者エディターの言語は提供元に従います。
 
-プラグイン自身の設定画面、OSの許可ダイアログ、デバイス・アプリ名は各提供元の言語に従います。VST2、AU、Intel専用プラグイン、サラウンド、Windows版ASIO互換は対象外です。
+## 導入とライセンス
 
-## 開発
+本体・ドライバの2つのpkgを使います。未公証版はmacOSの許可操作が必要になる場合があります。ビルド用シェルによる代替導入手順もあります。[導入手順](docs/INSTALL.ja.md)を確認してください。VST2/AU、Intel専用プラグイン、サラウンドには対応していません。
 
-```sh
-./build_app.sh
-open Audiomeeter.app
-./Tests/run_audio_tests.sh
-```
-
-Command Line Tools、CMake、Gitが必要です。JUCE 8.0.12を固定コミットから取得します。生成物・キャッシュ・ログ・ユーザー設定・録音はGit管理しません。テストは品質維持のため同梱します。
-
-アプリ・ホスト・配布ツールはAGPL-3.0-only、独立HALドライバはGPL-3.0-onlyです。`LICENSE.md`と第三者通知を確認してください。リモートは未設定で、署名・公証・権利確認を完了した一般配布版ではありません。外部配布前に[公開前の課題](docs/AUDIT.ja.md)と[ライセンス整理](docs/LICENSING.ja.md)を確認してください。
-
-## インストーラーを作成
-
-変更をGitへ記録した状態で `./build_installers.sh` を実行すると、`dist/`へ本体用・ドライバ用の2つの `.pkg`、対応ソース一式、SHA-256マニフェストを作成します。既定は未公証・未署名のローカル検証用パッケージです。インストールやアップロードは自動では行いません。[配布手順](docs/DISTRIBUTION.ja.md)を参照してください。
+アプリ／ホスト／配布ツールはAGPL-3.0-only、独立HALはGPL-3.0-only。依存素材には各条件が適用されます。[LICENSE](LICENSE.md)・[第三者通知](THIRD_PARTY_NOTICES.ja.md)を参照してください。Releaseへはバイナリだけでなく対応ソースも添付します。署名・公証・実機検証など[一般公開前の課題](docs/AUDIT.ja.md)が残っています。

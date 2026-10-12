@@ -1,54 +1,39 @@
-# 配布資材の作成（2026-10-12）
+[日本語](DISTRIBUTION.ja.md) | [English](DISTRIBUTION.en.md) · [Home](../README.md)
 
-## ローカル検証用
+# GitHub Releasesに添付するもの
 
-変更をコミットし、以下を実行します。生成物はGitへ入れません。生成後は `python3 Tools/verify_installers.py` でpkgを展開し、実ペイロード・署名・名前・UID・対応ソースを静的検証できます。インストールは行いません。
+現時点は**非公開リポジトリの試験版**です。Releaseは未作成で、リポジトリの一般公開やRelease公開は別途行います。以下を同じReleaseに添付します。
+
+| 資材 | 用途 |
+|---|---|
+| `Audiomeeter-App-1.0.0-12-arm64-LOCAL-UNSIGNED.pkg` | 本体・プラグインホスト・ライセンス |
+| `Audiomeeter-Drivers-1.0.0-12-arm64-LOCAL-UNSIGNED.pkg` | VAIO/AUX/B1/B2の4HAL |
+| `Audiomeeter-Source-1.0.0-12.tar.gz` | そのバイナリに対応するソース、改変HAL、固定JUCE、導入シェル・文書 |
+| `release-manifest-1.0.0-12-arm64-LOCAL-UNSIGNED.json` | ソースコミットと各ファイルのSHA-256 |
+
+GitHubの自動生成Source code(zip/tar.gz)だけで対応ソース資材を代用しないでください。対応ソースの取得場所・アクセスはバイナリの受領者にも提供します。非公開リポジトリのReleaseは招待された利用者しかアクセスできません。
+
+## Release本文テンプレート
+
+> Audiomeeter 1.0.0 build 12 — private test / 非公開試験版
+> Apple Silicon / macOS 14+ only. Not notarized; installer packages unsigned. / 未公証・パッケージ署名なし。
+> Install App, then Drivers if virtual routing is needed. Quit audio apps first; driver installation restarts Core Audio. / 本体→必要ならドライバの順。事前に音声アプリを終了。
+> See Installation / User guide / Known issues in both languages. Corresponding source and SHA-256 manifest are attached. / 日英導入・操作・既知の課題を参照。対応ソースとハッシュ同梱。
+> No third-party effect binaries. AGPL-3.0-only app; GPL-3.0-only HAL. / 第三者プラグイン本体は非同梱。
+
+公開時にはリンクをそのタグのドキュメントへ固定し、実際のコミット・検証環境・変更点を追記します。古いv1.0.0タグを最新版と誤認して使わず、確認済みHEADに新しいプレリリースタグを作成します。
+
+## 作成と確認
 
 ```sh
 ./build_installers.sh
+python3 Tools/verify_installers.py
 ```
 
-`dist/`に以下を作成します。
+コミット済みでクリーンな状態が必要です。生成物はdistのみでGitへ入れません。既存の配布用ビルドを再パッケージする場合は `./build_installers.sh --skip-build`。GitHubへのアップロードは自動では行いません。
 
-- `Audiomeeter-App-1.0.0-12-arm64-LOCAL-UNSIGNED.pkg`：本体、ホスト、ワーカー、許諾表示。
-- `Audiomeeter-Drivers-1.0.0-12-arm64-LOCAL-UNSIGNED.pkg`：HAL4個、GPL全文、改変表示。
-- `Audiomeeter-Source-1.0.0-12.tar.gz`：対応するGit管理ソースとJUCE 8.0.12固定ソース。履歴、署名鍵、ユーザー設定、録音、生成アプリは除外。
-- `release-manifest-*.json`：バージョン、ソースコミット、各成果物のSHA-256。
+## 一般配布の前
 
-本体・HALともApple Silicon、macOS 14以降です。本体だけ導入することもできます。ドライバを使うには別途ドライバ用pkgを導入します。パッケージは別ボリューム・ユーザー別HALへの導入には対応しません。
+Developer ID Application／Installerの両証明書を用意し、環境変数 `VM_CODESIGN_IDENTITY`、`VM_INSTALLER_SIGNING_IDENTITY` に設定して `./build_installers.sh --signed` を実行します。鍵をコミットしません。署名後もAppleへの公証提出・成功確認・stapleが必要です。最終成果物のハッシュを再計算し、manifestの公証状態を実態へ合わせます。[Apple公証手順](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)。
 
-インストール時に既存Audiomeeterファイルを管理者専用バックアップへ保存しますが、電源断等を含む完全な自動ロールバックは提供しません。Core Audio再起動で全体の音声が止まります。既存Voicemeeter／BlackHole／他社ドライバや録音は削除しません。旧デバイスから新デバイスへの設定変更は利用者が行います。HALのbundle IDはアプリと衝突しない`local.audiomeeter.driver.*`に分離し、デバイスUIDは維持します。
-
-アーカイブ内の `.build/dependencies/JUCE` はビルドキャッシュではなく、対応ソースとして同梱する固定依存ソースです。展開先で `./build_app.sh` を実行すれば、追加ダウンロードなしでそのJUCEソースを使用します。Xcode Command Line Tools、CMake、Python 3、macOS SDKは別途必要です。
-
-## 一般配布用の署名
-
-Developer ID証明書を別途取得し、**公開用の認証情報はソースへ保存しません**。
-
-```sh
-export VM_CODESIGN_IDENTITY='Developer ID Application: YOUR NAME (TEAMID)'
-export VM_INSTALLER_SIGNING_IDENTITY='Developer ID Installer: YOUR NAME (TEAMID)'
-./build_installers.sh --signed
-```
-
-本体・dylib・ワーカーを内側から署名し、HALも署名します。ワーカーだけは第三者VST3をロードするためLibrary Validationを解除します。これはセキュリティサンドボックスではありません。配布用モードではad-hocやApple Development証明書へ黙ってフォールバックしません。
-
-署名済みでも公証済みとは限りません。公開前にはAppleのnotarytoolへ各pkgを提出し、成功ログを確認し、staplerでチケットを添付して、最終成果物のハッシュを取り直します。このツールは認証情報を要求せず、提出・アップロードを自動実行しません。
-
-参考：[Appleの公証手順](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)。Gatekeeperを無効化する導入手順は採用しません。
-
-## ソース・通知
-
-アプリ／JUCEホストはAGPLv3、独立した改変HALはGPLv3として配布します。pkgと対応するソースを一緒に提供し、受領者のライセンス上の権利を制限しないでください。ライセンスは免責を含み、商用販売自体を禁じません。プラグイン製品・鍵・ユーザー設定は含めません。
-
-既存アイコンは所有者によるAI生成オリジナルとの説明に基づきそのまま使用します。Assets/AppIcon.mdへ来歴を記録しています。
-
-公開する場合はソースアーカイブを展開し、JUCEの同梱ソースを保存したまま配布するか、Git用にはJUCEを固定コミットから取得する通常の構成にします。既存開発履歴を外部へpushする作業はこのツールでは行いません。GitHub上の公開リポジトリをまだ作っていないため、対応ソースの公開URLは未設定です。実際に配布する時にはその版のソースアーカイブを継続提供してください。
-
-## 公開前に残る確認
-
-- このMacにはDeveloper ID Application／Installerの有効な組合せがなく、一般配布署名・公証は未実施。
-- 管理者権限でのpkg導入、クリーンMac、アップデート・失敗復元、実HALの再起動／DAW全二重／アプリ別trimは隔離環境で最終検証が必要。
-- BlackHole由来は特定し改変・GPL表示は維持したが、元の取得コミットの履歴は未復元。
-- Audiomeeter名称・画面外観・商標、任意の専有プラグインとの結合物を配布する場合の条件は別途確認。
-- 全macOS版・USB／Bluetooth機器・市販プラグインの組合せを網羅していない。一般公開済み品質や法的適法性の保証ではない。
+クリーンMacでの導入・更新・失敗復旧・HAL入出力・macOS権限を検証してから一般配布します。現在の環境には適切なDeveloper ID証明書がなく、これらは完了していません。[既知の課題](AUDIT.ja.md)。

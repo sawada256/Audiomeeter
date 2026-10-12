@@ -1,3 +1,5 @@
+[English terms](LICENSE.md) | [日本語の説明](docs/LICENSING.ja.md)
+
 # Audiomeeter licensing
 
 Copyright (C) 2026 Audiomeeter contributors.

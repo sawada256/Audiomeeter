@@ -1,3 +1,5 @@
+[English](THIRD_PARTY_NOTICES.md) | [日本語](THIRD_PARTY_NOTICES.ja.md)
+
 # Third-party provenance
 
 - **BlackHole**: `Drivers/BlackHoleCore.c` retains the original 2019 Existential Audio Inc. copyright. This repository contains a modified HAL implementation: per-application trim, independent full-duplex capture/playback transport, and Audiomeeter device naming. See `Drivers/MODIFICATIONS.md`; exact historical checkout provenance remains incomplete and is explicitly not represented as verified. The upstream source is GPLv3; official binaries, trademarks, and artwork have separate terms. [Upstream](https://github.com/ExistentialAudio/BlackHole), [license](LICENSES/BlackHole-GPL-3.0.txt).
