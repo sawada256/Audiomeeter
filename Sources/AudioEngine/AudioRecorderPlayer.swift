@@ -15,6 +15,10 @@ public enum RecordingSource: Int, CaseIterable, Identifiable, Codable {
     case strip3 = 7
     case stripVAIO = 8
     case stripAUX = 9
+    case strip4 = 10
+    case strip5 = 11
+    case busA4 = 12
+    case busA5 = 13
 
     public var id: Int { rawValue }
 
@@ -30,6 +34,28 @@ public enum RecordingSource: Int, CaseIterable, Identifiable, Codable {
         case .strip3: return "Hardware In 3"
         case .stripVAIO: return "VAIO (PC Audio)"
         case .stripAUX: return "AUX (Comms)"
+        case .strip4: return "Hardware In 4"
+        case .strip5: return "Hardware In 5"
+        case .busA4: return "Master A4"
+        case .busA5: return "Master A5"
+        }
+    }
+    var target: InsertTarget {
+        switch self {
+        case .busA1: return .bus(.A1)
+        case .busA2: return .bus(.A2)
+        case .busA3: return .bus(.A3)
+        case .busA4: return .bus(.A4)
+        case .busA5: return .bus(.A5)
+        case .busB1: return .bus(.B1)
+        case .busB2: return .bus(.B2)
+        case .strip1: return .strip(.hardware1)
+        case .strip2: return .strip(.hardware2)
+        case .strip3: return .strip(.hardware3)
+        case .strip4: return .strip(.hardware4)
+        case .strip5: return .strip(.hardware5)
+        case .stripVAIO: return .strip(.virtualVAIO)
+        case .stripAUX: return .strip(.virtualAUX)
         }
     }
 }
@@ -43,7 +69,7 @@ public final class AudioRecorderPlayer: ObservableObject {
     private let recordingErrorCounter = vm_counter_create()!
     @Published public var isPlaying: Bool = false { didSet { vm_counter_store(playCounter, isPlaying ? 1 : 0) } }
     @Published public var isPaused: Bool = false
-    @Published public var isLooping: Bool = false { didSet { vm_counter_store(loopCounter, isLooping ? 1 : 0) } }
+    @Published public var isLooping: Bool = false { didSet { vm_counter_store(loopCounter, isLooping ? 1 : 0); streamer?.looping = isLooping } }
     @Published public var currentTime: TimeInterval = 0.0
     @Published public var totalDuration: TimeInterval = 0.0
     @Published public var recordedDuration: TimeInterval = 0.0
@@ -80,10 +106,19 @@ public final class AudioRecorderPlayer: ObservableObject {
     private var recordingSampleRate: Double = 48000.0
 
     // MARK: - Internal Playback Resources
-    private var audioFileBuffer: [Float] = []
-    private var playbackReadIndex: Int = 0
+    // Swapped under playbackLock; the render callback only trylocks it.
+    private var streamer: PlaybackStreamer?
     private var playbackSampleRate: Double = 48000.0
     private var playbackLock = os_unfair_lock()
+    private var seenGeneration: UInt64 = .max // Render-callback only.
+    private let playedFramesCounter = vm_counter_create()! // Engine frames since the last seek.
+    private let engineRateBits = vm_counter_create()!
+    private let playbackUnderrunCounter = vm_counter_create()!
+    private let droppedRecordingCounter = vm_counter_create()!
+    private var seekBaseSeconds: TimeInterval = 0
+    /// Frames lost because the recording ring was full (disk writer too slow).
+    @Published public private(set) var recordingDroppedFrames: UInt64 = 0
+    public var playbackUnderruns: UInt64 { vm_counter_load(playbackUnderrunCounter) }
 
     public init() {
         // 2 second ring buffer at 48kHz stereo (96,000 frames)
@@ -94,8 +129,9 @@ public final class AudioRecorderPlayer: ObservableObject {
 
     deinit {
         stopRecording()
-        stopPlayback()
+        streamer?.stop()
         renderedPlayback.deallocate()
+        for counter in [playedFramesCounter, engineRateBits, playbackUnderrunCounter, droppedRecordingCounter, endedCounter] { vm_counter_destroy(counter) }
         vm_counter_destroy(recordingErrorCounter)
         vm_counter_destroy(workerCounter)
         vm_counter_destroy(playCounter)
@@ -111,13 +147,15 @@ public final class AudioRecorderPlayer: ObservableObject {
     public func pushRecordingFrames(buffer: UnsafePointer<Float>, frames: Int) {
         guard os_unfair_lock_trylock(&recordingLock) else { return }
         defer { os_unfair_lock_unlock(&recordingLock) }
-        if isRecordingWorkerRunning { _ = recordingRingBuffer.write(from: buffer, frameCount: frames) }
+        if isRecordingWorkerRunning {
+            let written = recordingRingBuffer.write(from: buffer, frameCount: frames)
+            if written < frames { vm_counter_store(droppedRecordingCounter, vm_counter_load(droppedRecordingCounter) + UInt64(frames - written)) }
+        }
     }
 
     private let renderedPlayback = UnsafeMutablePointer<Float>.allocate(capacity: 4096 * 2)
-    private var playbackPosition: Double = 0
     private var renderedRouteMask: UInt64 = 0
-    private var playbackEnded = false
+    private let endedCounter = vm_counter_create()!
 
     /// Render once per master cycle so every routed bus receives identical samples.
     public func renderPlayback(frames: Int, engineRate: Double) {
@@ -125,26 +163,35 @@ public final class AudioRecorderPlayer: ObservableObject {
         renderedRouteMask = 0
         guard os_unfair_lock_trylock(&playbackLock) else { return }
         defer { os_unfair_lock_unlock(&playbackLock) }
-        guard vm_counter_load(playCounter) != 0, !audioFileBuffer.isEmpty else { return }
-        renderedRouteMask = vm_counter_load(routeCounter)
-        let looping = vm_counter_load(loopCounter) != 0
-        let totalFrames = audioFileBuffer.count / 2
-        let step = playbackSampleRate / engineRate
-        for i in 0..<frames {
-            if playbackPosition >= Double(totalFrames) {
-                if looping { playbackPosition.formTruncatingRemainder(dividingBy: Double(totalFrames)) }
-                else { playbackEnded = true; break }
-            }
-            let first = Int(playbackPosition)
-            let next = first + 1 < totalFrames ? first + 1 : (looping ? 0 : first)
-            let fraction = Float(playbackPosition - Double(first))
-            for channel in 0..<2 {
-                let a = audioFileBuffer[first * 2 + channel]
-                renderedPlayback[i * 2 + channel] = a + fraction * (audioFileBuffer[next * 2 + channel] - a)
-            }
-            playbackPosition += step
+        guard let streamer else { return }
+        streamer.setTargetRate(engineRate)
+        vm_counter_store(engineRateBits, engineRate.bitPattern)
+        // A seek published a new segment: drop exactly the audio written before it.
+        let ready = streamer.ready
+        if ready != seenGeneration {
+            streamer.ring.skip(to: streamer.segmentStart)
+            seenGeneration = ready; vm_counter_store(playedFramesCounter, 0)
         }
-        playbackReadIndex = min(totalFrames, Int(playbackPosition)) * 2
+        guard vm_counter_load(playCounter) != 0, streamer.requested == ready else { return }
+        renderedRouteMask = vm_counter_load(routeCounter)
+        let got = streamer.ring.read(into: renderedPlayback, frameCount: frames)
+        vm_counter_store(playedFramesCounter, vm_counter_load(playedFramesCounter) + UInt64(got))
+        if got < frames {
+            if streamer.reachedEnd && streamer.ring.availableRead() == 0 { vm_counter_store(endedCounter, 1) }
+            else { vm_counter_store(playbackUnderrunCounter, vm_counter_load(playbackUnderrunCounter) + 1) }
+        }
+    }
+    /// Test hook: waits until the reader thread has buffered `frames` engine frames.
+    @discardableResult func waitForBufferedPlayback(frames: Int, timeout: TimeInterval = 2) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            os_unfair_lock_lock(&playbackLock)
+            let ready = streamer.map { $0.requested == $0.ready && $0.ring.availableRead() >= frames } ?? false
+            os_unfair_lock_unlock(&playbackLock)
+            if ready { return true }
+            usleep(2000)
+        }
+        return false
     }
 
     public func mixRenderedPlayback(bus: BusID, buffer: UnsafeMutablePointer<Float>, frames: Int) {
@@ -158,6 +205,7 @@ public final class AudioRecorderPlayer: ObservableObject {
         guard !isRecording, !isFinalizingRecording else { return nil }
         recordingError = nil
         vm_counter_store(recordingErrorCounter, 0)
+        vm_counter_store(droppedRecordingCounter, 0); recordingDroppedFrames = 0
 
         self.recordingSampleRate = sampleRate
         let fileManager = FileManager.default
@@ -376,42 +424,21 @@ public final class AudioRecorderPlayer: ObservableObject {
 
     public func loadAudioFile(url: URL) -> Bool {
         do {
-            let file = try AVAudioFile(forReading: url)
-            let format = file.processingFormat
-            let frameCount = UInt32(file.length)
-
-            guard let pcmBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else {
-                return false
-            }
-            try file.read(into: pcmBuffer)
-
+            let next = try PlaybackStreamer(url: url)
+            next.looping = isLooping
+            next.seek(toFileFrame: 0)
             os_unfair_lock_lock(&playbackLock)
-            let channels = Int(format.channelCount)
-            let frames = Int(pcmBuffer.frameLength)
-            var interleaved = [Float](repeating: 0, count: frames * 2)
-
-            if channels >= 2, let left = pcmBuffer.floatChannelData?[0], let right = pcmBuffer.floatChannelData?[1] {
-                for i in 0..<frames {
-                    interleaved[i * 2] = left[i]
-                    interleaved[i * 2 + 1] = right[i]
-                }
-            } else if channels == 1, let mono = pcmBuffer.floatChannelData?[0] {
-                for i in 0..<frames {
-                    interleaved[i * 2] = mono[i]
-                    interleaved[i * 2 + 1] = mono[i]
-                }
-            }
-
-            self.audioFileBuffer = interleaved
-            self.playbackReadIndex = 0
-            self.playbackPosition = 0
-            self.playbackEnded = false
-            self.playbackSampleRate = format.sampleRate
-            self.totalDuration = Double(frames) / format.sampleRate
-            self.currentFileName = url.lastPathComponent
-            self.currentTime = 0.0
+            let previous = streamer
+            streamer = next
+            seenGeneration = .max
             os_unfair_lock_unlock(&playbackLock)
-
+            previous?.stop() // Outside the lock; the callback no longer references it.
+            vm_counter_store(endedCounter, 0); vm_counter_store(playedFramesCounter, 0)
+            playbackSampleRate = next.fileRate
+            seekBaseSeconds = 0
+            totalDuration = next.duration
+            currentFileName = url.lastPathComponent
+            currentTime = 0.0
             return true
         } catch {
             print("Failed to load audio file: \(error)")
@@ -420,7 +447,8 @@ public final class AudioRecorderPlayer: ObservableObject {
     }
 
     public func play() {
-        guard !audioFileBuffer.isEmpty else { return }
+        guard streamer != nil else { return }
+        if vm_counter_load(endedCounter) != 0 { seek(progress: 0) }
         isPaused = false
         isPlaying = true
     }
@@ -433,23 +461,16 @@ public final class AudioRecorderPlayer: ObservableObject {
     public func stopPlayback() {
         isPlaying = false
         isPaused = false
-        os_unfair_lock_lock(&playbackLock)
-        playbackReadIndex = 0
-        playbackPosition = 0
-        playbackEnded = false
-        currentTime = 0.0
-        os_unfair_lock_unlock(&playbackLock)
+        seek(progress: 0)
     }
 
     public func seek(progress: Double) {
-        os_unfair_lock_lock(&playbackLock)
-        let totalFrames = audioFileBuffer.count / 2
-        let targetFrame = Int(progress * Double(totalFrames))
-        playbackReadIndex = max(0, min(max(0, totalFrames - 1), targetFrame)) * 2
-        playbackPosition = Double(playbackReadIndex / 2)
-        playbackEnded = false
-        currentTime = Double(targetFrame) / (playbackSampleRate > 0 ? playbackSampleRate : 48000.0)
-        os_unfair_lock_unlock(&playbackLock)
+        guard let streamer else { return }
+        let target = max(0, min(1, progress.isFinite ? progress : 0)) * streamer.duration
+        streamer.seek(toFileFrame: Int64(target * streamer.fileRate))
+        vm_counter_store(endedCounter, 0)
+        seekBaseSeconds = target
+        currentTime = target
     }
 
     public func updatePlaybackTime() {
@@ -457,13 +478,14 @@ public final class AudioRecorderPlayer: ObservableObject {
         if isRecording, vm_counter_load(recordingErrorCounter) != 0 {
             Task { @MainActor in await self.finishRecording() }
         }
+        let dropped = vm_counter_load(droppedRecordingCounter)
+        if dropped != recordingDroppedFrames { recordingDroppedFrames = dropped }
         if isPlaying && totalDuration > 0 {
-            os_unfair_lock_lock(&playbackLock)
-            if playbackEnded { isPlaying = false; playbackEnded = false }
-            let currentFrame = playbackReadIndex / 2
-            let rate = playbackSampleRate > 0 ? playbackSampleRate : 48000.0
-            self.currentTime = Double(currentFrame) / rate
-            os_unfair_lock_unlock(&playbackLock)
+            if vm_counter_load(endedCounter) != 0 { isPlaying = false; currentTime = totalDuration; return }
+            let rate = Double(bitPattern: vm_counter_load(engineRateBits))
+            let elapsed = rate > 0 ? Double(vm_counter_load(playedFramesCounter)) / rate : 0
+            let position = seekBaseSeconds + elapsed
+            currentTime = isLooping ? position.truncatingRemainder(dividingBy: totalDuration) : min(totalDuration, position)
         }
         if isRecording, let start = recordingStartTime {
             self.recordedDuration = Date().timeIntervalSince(start)

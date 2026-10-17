@@ -48,35 +48,26 @@ public struct LEDButton: View {
 /// Routing Matrix Block: [A1] [A2] [A3] / [B1] [B2]
 public struct RoutingButtonsView: View {
     public let routing: RoutingMatrix
+    public let buses: [BusID]
     public let onToggle: (BusID) -> Void
 
-    public init(routing: RoutingMatrix, onToggle: @escaping (BusID) -> Void) {
+    public init(routing: RoutingMatrix, buses: [BusID] = [.A1, .A2, .A3, .B1, .B2], onToggle: @escaping (BusID) -> Void) {
         self.routing = routing
+        self.buses = buses
         self.onToggle = onToggle
     }
 
     public var body: some View {
         VStack(spacing: 4) {
-            // A1, A2, A3
+            // Physical A buses (3 to 5), then virtual B1/B2
             HStack(spacing: 3) {
-                LEDButton(label: "A1", isActive: routing.a1, activeColor: VMTheme.ledAActive) {
-                    onToggle(.A1)
-                }
-                LEDButton(label: "A2", isActive: routing.a2, activeColor: VMTheme.ledAActive) {
-                    onToggle(.A2)
-                }
-                LEDButton(label: "A3", isActive: routing.a3, activeColor: VMTheme.ledAActive) {
-                    onToggle(.A3)
+                ForEach(buses.filter(\.isPhysical)) { bus in
+                    LEDButton(label: bus.name, isActive: routing[bus], activeColor: VMTheme.ledAActive, fontSize: buses.count > 5 ? 9 : 10) { onToggle(bus) }
                 }
             }
-
-            // B1, B2
             HStack(spacing: 3) {
-                LEDButton(label: "B1", isActive: routing.b1, activeColor: VMTheme.ledBActive) {
-                    onToggle(.B1)
-                }
-                LEDButton(label: "B2", isActive: routing.b2, activeColor: VMTheme.ledBActive) {
-                    onToggle(.B2)
+                ForEach(buses.filter(\.isVirtual)) { bus in
+                    LEDButton(label: bus.name, isActive: routing[bus], activeColor: VMTheme.ledBActive) { onToggle(bus) }
                 }
             }
         }

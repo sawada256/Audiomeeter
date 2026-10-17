@@ -115,6 +115,17 @@ public final class AudioDeviceManager {
         return status == noErr ? frames : 256
     }
 
+    /// Output-side device latency in frames: device + safety offset + one IO buffer.
+    public func deviceLatency(id: AudioObjectID) -> Int {
+        var total = 0
+        for selector in [kAudioDevicePropertyLatency, kAudioDevicePropertySafetyOffset] {
+            var address = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeOutput, mElement: kAudioObjectPropertyElementMain)
+            var value: UInt32 = 0, size = UInt32(MemoryLayout<UInt32>.size)
+            if AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value) == noErr { total += Int(value) }
+        }
+        return total + Int(getDeviceBufferSize(id: id))
+    }
+
     public func setDeviceBufferSize(id: AudioObjectID, frames: UInt32) throws {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyBufferFrameSize,

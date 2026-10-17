@@ -65,7 +65,12 @@ final class MIDIInputManager {
                 let words = raw.bindMemory(to: UInt32.self)
                 var index = 0
                 while index < min(count, words.count) {
-                    if let event = MIDIEvent.decode(umpWord: words[index]) { events.append(event) }
+                    let word = words[index]
+                    if word >> 28 == 2 {
+                        // Plugins with MIDI input receive every channel-voice message, unbatched.
+                        MIDIPluginRouter.shared.forward(status: UInt8((word >> 16) & 0xFF), data1: UInt8((word >> 8) & 0x7F), data2: UInt8(word & 0x7F))
+                    }
+                    if let event = MIDIEvent.decode(umpWord: word) { events.append(event) }
                     index += MIDIEvent.umpWordCount(words[index])
                 }
             }

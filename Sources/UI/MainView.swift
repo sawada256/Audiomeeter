@@ -26,9 +26,9 @@ public struct MainView: View {
                 HStack(alignment: .top, spacing: 2) {
                     // Hardware Inputs 1, 2, 3
                     HStack(spacing: 2) {
-                        HardwareStripView(stripID: .hardware1, appState: appState)
-                        HardwareStripView(stripID: .hardware2, appState: appState)
-                        HardwareStripView(stripID: .hardware3, appState: appState)
+                        ForEach(appState.visibleStrips.filter(\.isHardware)) { strip in
+                            HardwareStripView(stripID: strip, appState: appState)
+                        }
                     }
 
                     // Virtual Inputs (VAIO, AUX)
@@ -130,6 +130,9 @@ public struct MainView: View {
             // Menu Dropdown
             Menu {
                 Button(L10n.text("オーディオ設定…")) { showingSettings = true }
+                Button(L10n.text("マクロボタンとシーン…")) { AuxiliaryWindows.show(.macros) }
+                Button(L10n.text("ルーティングマトリクス…")) { AuxiliaryWindows.show(.routing) }
+                Button(L10n.text("診断…")) { AuxiliaryWindows.show(.diagnostics) }
                 Divider()
                 Button(L10n.text("Restart Audio Engine")) {
                     appState.restartAudioEngine()

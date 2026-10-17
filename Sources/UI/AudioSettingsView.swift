@@ -31,7 +31,16 @@ struct AudioSettingsView: View {
             if appState.loginApprovalRequired {
                 Button(L10n.text("システム設定でログイン項目を許可")) { SMAppService.openSystemSettingsLoginItems() }
             }
-            Button(L10n.text("信号順序")) { showBusOrder = true }
+            HStack {
+                Button(L10n.text("信号順序")) { showBusOrder = true }
+                Spacer()
+                Picker(L10n.text("ハードウェア入力"), selection: Binding(get: { appState.hardwareInputCount }, set: { appState.setLayout(hardwareInputs: $0, physicalBuses: appState.physicalBusCount) })) {
+                    ForEach(3...5, id: \.self) { Text("\($0)").tag($0) }
+                }.frame(width: 170)
+                Picker(L10n.text("物理出力バス"), selection: Binding(get: { appState.physicalBusCount }, set: { appState.setLayout(hardwareInputs: appState.hardwareInputCount, physicalBuses: $0) })) {
+                    ForEach(3...5, id: \.self) { Text("A1–A\($0)").tag($0) }
+                }.frame(width: 190)
+            }
             Form {
                 Picker(L10n.text("サンプルレート"), selection: $rate) {
                     ForEach([44100.0, 48000, 88200, 96000, 176400, 192000], id: \.self) { value in
@@ -55,7 +64,7 @@ struct AudioSettingsView: View {
                         Text(L10n.text("左右の物理チャンネルを個別に選択できます。変更はすぐ反映されます。同じ出力チャンネルに左右を割り当てるとモノラルに合成します。"))
                             .font(.caption).foregroundStyle(.secondary)
                         Text(L10n.text("入力チャンネル")).font(.headline)
-                        ForEach(StripID.allCases) { strip in
+                        ForEach(appState.visibleStrips) { strip in
                             let device = appState.inputDevices.first { $0.uid == appState.strips[strip]?.deviceUID }
                             channelRow(name: strip.shortName, device: device?.name, count: device?.inChannels ?? 0,
                                        left: Binding(get: { appState.strips[strip]?.leftChannel ?? appState.strips[strip]?.channelOffset ?? 0 }, set: { appState.setStripChannel(strip: strip, left: true, channel: $0) }),
@@ -63,7 +72,7 @@ struct AudioSettingsView: View {
                         }
                         Divider()
                         Text(L10n.text("出力チャンネル")).font(.headline)
-                        ForEach(BusID.allCases) { bus in
+                        ForEach(appState.visibleBuses) { bus in
                             let device = appState.outputDevices.first { $0.uid == appState.buses[bus]?.deviceUID }
                             channelRow(name: bus.name, device: device?.name, count: device?.outChannels ?? 0,
                                        left: Binding(get: { appState.buses[bus]?.leftChannel ?? appState.buses[bus]?.channelOffset ?? 0 }, set: { appState.setBusChannel(bus: bus, left: true, channel: $0) }),
@@ -80,7 +89,14 @@ struct AudioSettingsView: View {
                         .font(.caption).foregroundStyle(.secondary)
                     Text(L10n.text("補正にはプラグイン＋プロセス通信の遅延が含まれます。機器固有の遅延は、各バスに追加ディレイを設定して調整してください。"))
                         .font(.caption).foregroundStyle(.secondary)
-                    ForEach(BusID.allCases) { bus in
+                    Picker(L10n.text("インサートのバイパス（クリック時）"), selection: Binding(get: { appState.defaultBypassMode }, set: appState.setDefaultBypassMode)) {
+                        Text(L10n.text("簡易（遅延を維持）")).tag(InsertBypassMode.latency)
+                        Text(L10n.text("完全（経路から外す）")).tag(InsertBypassMode.full)
+                    }
+                    Text(L10n.text("⌥クリックでもう一方のバイパスになります。簡易はプラグイン自身のバイパスを使い（無い場合は遅延を合わせた原音）、PDCは変わりません。完全はプラグインを経路から外し、遅延補正も減ります。"))
+                        .font(.caption).foregroundStyle(.secondary)
+                    Toggle(L10n.text("停止・遅延したプラグインを自動で再起動（1分に3回まで）"), isOn: Binding(get: { appState.automaticPluginRestart }, set: appState.setAutomaticPluginRestart))
+                    ForEach(appState.visibleBuses) { bus in
                         HStack {
                             Text(bus.name).frame(width: 28)
                             Slider(value: Binding(get: { appState.buses[bus]?.delayMilliseconds ?? 0 }, set: { appState.setBusDelay(bus: bus, milliseconds: $0) }), in: 0...500)
@@ -91,7 +107,7 @@ struct AudioSettingsView: View {
                 }.padding(12).tabItem { Text(L10n.text("遅延補正")) }
                 DesktopControlsSettingsView(state: appState).tabItem { Text(L10n.text("キー・常駐表示")) }
                 MIDISettingsView(state: appState, monitor: appState.midiMonitor).tabItem { Text("MIDI") }
-            }.frame(height: 395)
+            }.frame(height: 430)
             Text(String(format: L10n.text("1ブロック: %.2f ms • 現在: %.0f Hz / %d samples"), Double(buffer) / rate * 1000, appState.engineSampleRate, appState.engineBufferSize))
                 .font(.system(.caption, design: .monospaced))
             Text(L10n.text("設定はA1のデバイスへ適用されます。対応値はデバイスにより異なり、適用中は音声が一時停止します。表示の時間にはデバイス・クロック補正・プラグインの遅延は含まれません。"))
@@ -160,21 +176,37 @@ struct InsertRackView: View {
                             ForEach(slots) { slot in
                                 VStack(alignment: .leading, spacing: 6) {
                                 HStack(spacing: 8) {
-                                    Toggle("", isOn: Binding(get: { !slot.bypassed }, set: { appState.changeInsert(target: target, id: slot.id, bypass: !$0) }))
-                                        .labelsHidden().help(L10n.text("有効／バイパス"))
+                                    Picker("", selection: Binding(get: { slot.effectiveBypass?.rawValue ?? "on" }, set: { appState.setInsertBypass(target: target, id: slot.id, mode: InsertBypassMode(rawValue: $0)) })) {
+                                        Text(L10n.text("有効")).tag("on")
+                                        Text(L10n.text("簡易")).tag(InsertBypassMode.latency.rawValue)
+                                        Text(L10n.text("完全")).tag(InsertBypassMode.full.rawValue)
+                                    }.pickerStyle(.segmented).labelsHidden().frame(width: 150).help(InsertBypassUI.help(slot))
                                     Text(slot.name).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                                        .foregroundStyle(slot.isFullyBypassed ? Color.secondary.opacity(0.5) : slot.isSoftBypassed ? Color.secondary : Color.primary)
                                     Button(L10n.text("編集")) { appState.editInsert(target: target, id: slot.id) }
                                     Button("↑") { appState.changeInsert(target: target, id: slot.id, move: -1) }
                                     Button("↓") { appState.changeInsert(target: target, id: slot.id, move: 1) }
                                     Button(role: .destructive) { appState.changeInsert(target: target, id: slot.id, remove: true) } label: { Image(systemName: "trash") }
                                 }
+                                HStack(spacing: 8) {
+                                    Picker(L10n.text("MIDI入力"), selection: Binding(get: { slot.midiInput ?? -1 }, set: { appState.setInsertMIDIInput(target: target, id: slot.id, channel: $0 < 0 ? nil : $0) })) {
+                                        Text("OFF").tag(-1)
+                                        Text(L10n.text("全チャンネル")).tag(0)
+                                        ForEach(1...16, id: \.self) { Text("CH \($0)").tag($0) }
+                                    }.frame(width: 190)
+                                    Button(L10n.text("パラメーターをMIDIに割り当て")) { appState.beginPluginParameterLearn(insert: slot.id, parameter: nil) }
+                                        .help(L10n.text("Learnを開始します。MIDI設定タブで「最後に操作したパラメーター」を選ぶか、一覧から選んでください。"))
+                                    if slot.isSoftBypassed && appState.insertHasBypassParameter[slot.id] == false {
+                                        Text(L10n.text("プラグインにバイパス機能がないため、遅延を合わせた原音を出力中")).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }.font(.caption)
                                 if (appState.insertSideChannels[slot.id] ?? 0) > 0 {
                                     Picker(L10n.text("サイドチェイン"), selection: Binding<Int>(get: { slot.sidechainBus.map { 100 + $0.rawValue } ?? slot.sidechain?.rawValue ?? -1 }, set: { source in
                                         appState.setInsertSidechain(target: target, id: slot.id, strip: source >= 0 && source < 100 ? StripID(rawValue: source) : nil, bus: source >= 100 ? BusID(rawValue: source - 100) : nil)
                                     })) {
                                         Text(L10n.text("未設定（無音）")).tag(-1)
-                                        ForEach(StripID.allCases) { strip in Text(strip.shortName).tag(strip.rawValue) }
-                                        ForEach(BusID.allCases) { bus in Text(bus.name).tag(100 + bus.rawValue) }
+                                        ForEach(appState.visibleStrips) { strip in Text(strip.shortName).tag(strip.rawValue) }
+                                        ForEach(appState.visibleBuses) { bus in Text(bus.name).tag(100 + bus.rawValue) }
                                     }
                                     if let bus = slot.sidechainBus {
                                         let feedback = appState.sidechainUsesPreviousBlock(target: target, bus: bus)
@@ -201,7 +233,7 @@ struct InsertRackView: View {
             Text(L10n.text("サイドチェイン: 入力はPREインサート前、バスはインサート・フェーダー・追加ディレイ後／最終出力の自動補正前。循環接続のみ前のブロックを使用します。各プラグインのプロセス通信には別途1ブロックの遅延があります。"))
                 .font(.caption).foregroundStyle(.secondary)
         }
-        .padding(24).frame(width: 640, height: 480)
+        .padding(24).frame(width: 700, height: 540)
         .sheet(isPresented: $showingPicker) {
             PluginPickerView { entry in
                 showingPicker = false

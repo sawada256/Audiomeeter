@@ -104,7 +104,7 @@ public struct VirtualStripView: View {
             .frame(height: MixerLayout.controlsHeight, alignment: .top)
 
             // Routing Matrix [A1] [A2] [A3] / [B1] [B2]
-            RoutingButtonsView(routing: settings.routing) { bus in
+            RoutingButtonsView(routing: settings.routing, buses: appState.visibleBuses) { bus in
                 appState.toggleRouting(strip: stripID, bus: bus)
             }
 

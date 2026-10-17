@@ -23,9 +23,9 @@ swiftc Sources/Localization/Localization.swift Sources/Localization/EnglishCatal
 .build/audio-tests/drift
 cmake -S Native/PluginHost -B .build/plugin-host -DJUCE_SOURCE="$TASK_ROOT/.build/dependencies/JUCE" -DCMAKE_BUILD_TYPE=Release -DVM_BUILD_TEST_PLUGIN=ON > .build/audio-tests/plugin-build.log 2>&1
 cmake --build .build/plugin-host --parallel 4 >> .build/audio-tests/plugin-build.log 2>&1
-swiftc Sources/Localization/Localization.swift Sources/Localization/EnglishCatalog.swift Sources/Localization/JapaneseCatalog.swift "${SWIFT_FLAGS[@]}" Sources/AudioEngine/AudioTypes.swift Sources/AudioEngine/RingBuffer.swift Sources/AudioEngine/AudioBufferIO.swift Sources/AudioEngine/DSPProcessor.swift Sources/AudioEngine/InputPadDSP.swift Sources/AudioEngine/Resampler.swift Sources/AudioEngine/AudioRecorderPlayer.swift Tests/AudioRegressionTests.swift -o .build/audio-tests/regression
+swiftc Sources/Localization/Localization.swift Sources/Localization/EnglishCatalog.swift Sources/Localization/JapaneseCatalog.swift "${SWIFT_FLAGS[@]}" Sources/AudioEngine/AudioTypes.swift Sources/AudioEngine/RingBuffer.swift Sources/AudioEngine/AudioBufferIO.swift Sources/AudioEngine/DSPProcessor.swift Sources/AudioEngine/InputPadDSP.swift Sources/AudioEngine/Resampler.swift Sources/AudioEngine/AudioRecorderPlayer.swift Sources/AudioEngine/PlaybackStreamer.swift Tests/AudioRegressionTests.swift -o .build/audio-tests/regression
 .build/audio-tests/regression "$TASK_ROOT/.build/audio-tests" "$TASK_ROOT/.build/plugin-host"
-swiftc Sources/Localization/*.swift "${SWIFT_FLAGS[@]}" Sources/AudioEngine/AudioTypes.swift Sources/AudioEngine/RingBuffer.swift Sources/AudioEngine/AudioRecorderPlayer.swift Tests/RecorderLifecycleTests.swift -o .build/audio-tests/recorder-lifecycle
+swiftc Sources/Localization/*.swift "${SWIFT_FLAGS[@]}" Sources/AudioEngine/AudioTypes.swift Sources/AudioEngine/RingBuffer.swift Sources/AudioEngine/AudioRecorderPlayer.swift Sources/AudioEngine/PlaybackStreamer.swift Tests/RecorderLifecycleTests.swift -o .build/audio-tests/recorder-lifecycle
 .build/audio-tests/recorder-lifecycle
 
 clang -O2 -Wno-format-extra-args -framework CoreAudio -framework CoreFoundation -framework Accelerate Tests/DriverTrimTests.c -o .build/audio-tests/driver-trim
@@ -40,7 +40,7 @@ clang -O2 -Wno-format-extra-args -framework CoreAudio -framework CoreFoundation 
 swiftc Sources/Localization/Localization.swift Sources/Localization/EnglishCatalog.swift Sources/Localization/JapaneseCatalog.swift "${SWIFT_FLAGS[@]}" Sources/AudioEngine/AudioTypes.swift Sources/AudioEngine/LatencyCompensation.swift Sources/AudioEngine/PluginInserts.swift Tests/PluginWorkerTests.swift -o .build/audio-tests/plugin-worker
 .build/audio-tests/plugin-worker
 
-ENGINE_TEST_SOURCES=(Sources/AudioEngine/AudioTypes.swift Sources/AudioEngine/RingBuffer.swift Sources/AudioEngine/Resampler.swift Sources/AudioEngine/AudioBufferIO.swift Sources/AudioEngine/AudioDeviceManager.swift Sources/AudioEngine/AudioDeviceIO.swift Sources/AudioEngine/DSPProcessor.swift Sources/AudioEngine/InputPadDSP.swift Sources/AudioEngine/AudioRecorderPlayer.swift Sources/AudioEngine/DAWDuplexTransport.swift Sources/AudioEngine/LatencyCompensation.swift Sources/AudioEngine/PluginInserts.swift Sources/AudioEngine/SidechainRouting.swift Sources/AudioEngine/AudiomeeterEngine.swift Sources/AudioEngine/SpectrumAnalysis.swift)
+ENGINE_TEST_SOURCES=(Sources/AudioEngine/AudioTypes.swift Sources/AudioEngine/RingBuffer.swift Sources/AudioEngine/Resampler.swift Sources/AudioEngine/AudioBufferIO.swift Sources/AudioEngine/AudioDeviceManager.swift Sources/AudioEngine/AudioDeviceIO.swift Sources/AudioEngine/DSPProcessor.swift Sources/AudioEngine/InputPadDSP.swift Sources/AudioEngine/AudioRecorderPlayer.swift Sources/AudioEngine/PlaybackStreamer.swift Sources/AudioEngine/DAWDuplexTransport.swift Sources/AudioEngine/LatencyCompensation.swift Sources/AudioEngine/PluginInserts.swift Sources/AudioEngine/SidechainRouting.swift Sources/AudioEngine/AudiomeeterEngine.swift Sources/AudioEngine/SpectrumAnalysis.swift Sources/AudioEngine/EngineDiagnostics.swift)
 swiftc Sources/Localization/Localization.swift Sources/Localization/EnglishCatalog.swift Sources/Localization/JapaneseCatalog.swift -DVM_AUDIO_TESTS "${SWIFT_FLAGS[@]}" "${ENGINE_TEST_SOURCES[@]}" Tests/MixerLatencyTests.swift -o .build/audio-tests/mixer-latency
 .build/audio-tests/mixer-latency
 .build/audio-tests/mixer-latency --virtual
@@ -55,6 +55,8 @@ swiftc Sources/Localization/Localization.swift Sources/Localization/EnglishCatal
 .build/audio-tests/realtime-safety
 swiftc Sources/Localization/*.swift Sources/AudioEngine/AudioTypes.swift Sources/State/MIDIMapping.swift Tests/MIDIMappingTests.swift -o .build/audio-tests/midi-mapping
 .build/audio-tests/midi-mapping
+swiftc Sources/Localization/*.swift Sources/AudioEngine/AudioTypes.swift Sources/State/DesktopControlsPreferences.swift Sources/State/MacroScenes.swift Tests/MacroScriptTests.swift -o .build/audio-tests/macro-script
+.build/audio-tests/macro-script
 swiftc Sources/Localization/Localization.swift Sources/Localization/EnglishCatalog.swift Sources/Localization/JapaneseCatalog.swift "${SWIFT_FLAGS[@]}" Sources/AudioEngine/DAWDuplexTransport.swift Tests/DAWDuplexHALTests.swift -o .build/audio-tests/hal-duplex
 if [ "${VM_TEST_DUPLEX_HAL:-0}" = 1 ]; then
     if pgrep -x Audiomeeter >/dev/null; then

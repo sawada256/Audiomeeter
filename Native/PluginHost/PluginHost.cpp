@@ -35,14 +35,31 @@ struct EditorWindow final : DocumentWindow {
         return DocumentWindow::keyPressed(key);
     }
 };
+struct TouchListener final : AudioProcessorListener {
+    void (*callback)(void*, int) = nullptr;
+    void* context = nullptr;
+    void audioProcessorParameterChanged(AudioProcessor*, int index, float) override { if (callback) callback(context, index); }
+    void audioProcessorChanged(AudioProcessor*, const ChangeDetails&) override {}
+};
 struct Plugin {
     std::unique_ptr<AudioPluginInstance> instance;
     std::unique_ptr<EditorWindow> editor;
     AudioBuffer<float> buffer;
     MidiBuffer midi;
-    std::string name, state;
-    explicit Plugin(std::unique_ptr<AudioPluginInstance> p) : instance(std::move(p)), name(instance->getName().toStdString()) { buffer.setSize(jmax(instance->getTotalNumInputChannels(), instance->getTotalNumOutputChannels()), capacity); midi.ensureSize(2048); }
-    ~Plugin() { vm_release_editor_commands(this); editor.reset(); instance->releaseResources(); }
+    std::string name, state, parameters;
+    AudioProcessorParameter* bypass = nullptr;
+    bool bypassOn = false;
+    // Dry history for latency-matched soft bypass of plugins without a bypass parameter.
+    AudioBuffer<float> dry;
+    int dryPosition = 0;
+    TouchListener touch;
+    explicit Plugin(std::unique_ptr<AudioPluginInstance> p) : instance(std::move(p)), name(instance->getName().toStdString()) {
+        buffer.setSize(jmax(instance->getTotalNumInputChannels(), instance->getTotalNumOutputChannels()), capacity); midi.ensureSize(4096);
+        bypass = instance->getBypassParameter();
+        dry.setSize(2, jlimit(capacity + 1, 262144 + capacity + 1, instance->getLatencySamples() + capacity + 1)); dry.clear();
+        instance->addListener(&touch);
+    }
+    ~Plugin() { instance->removeListener(&touch); vm_release_editor_commands(this); editor.reset(); instance->releaseResources(); }
 };
 }
 extern "C" {
@@ -138,6 +155,77 @@ void vm_juce_process_side(void* p, float* audio, const float* side, int frames) 
     for (int i=0;i<frames;++i) { audio[i*2]=output.getSample(0,i);audio[i*2+1]=output.getSample(jmin(1,output.getNumChannels()-1),i); }
 }
 void vm_juce_process(void* p,float* audio,int frames) { vm_juce_process_side(p,audio,nullptr,frames); }
+// Full render entry used by the worker: MIDI input and latency-preserving soft bypass.
+void vm_juce_process_ex(void* p,float* audio,const float* side,int frames,const uint32_t* midi,int midiCount,int softBypass) {
+    if (frames <= 0 || frames > capacity) return;
+    auto& plugin = *static_cast<Plugin*>(p);
+    const int dryFrames = plugin.dry.getNumSamples();
+    const int delay = jlimit(0, dryFrames - frames - 1, plugin.instance->getLatencySamples());
+    // Always record the input, so switching to bypass outputs a continuous delayed signal.
+    for (int i = 0; i < frames; ++i) {
+        const int at = (plugin.dryPosition + i) % dryFrames;
+        plugin.dry.setSample(0, at, audio[i*2]); plugin.dry.setSample(1, at, audio[i*2+1]);
+    }
+    const bool bypassed = softBypass != 0;
+    if (plugin.bypass != nullptr && bypassed != plugin.bypassOn) { plugin.bypass->setValue(bypassed ? 1.0f : 0.0f); plugin.bypassOn = bypassed; }
+    if (bypassed && plugin.bypass == nullptr) {
+        for (int i = 0; i < frames; ++i) {
+            const int at = (plugin.dryPosition + i - delay + dryFrames) % dryFrames;
+            audio[i*2] = plugin.dry.getSample(0, at); audio[i*2+1] = plugin.dry.getSample(1, at);
+        }
+        plugin.dryPosition = (plugin.dryPosition + frames) % dryFrames;
+        return;
+    }
+    plugin.dryPosition = (plugin.dryPosition + frames) % dryFrames;
+    const ScopedLock lock(plugin.instance->getCallbackLock());
+    plugin.buffer.clear();
+    auto main = plugin.instance->getBusBuffer(plugin.buffer, true, 0);
+    for (int i=0; i<frames; ++i) {
+        if (main.getNumChannels()==1) main.setSample(0,i,(audio[i*2]+audio[i*2+1])*.5f);
+        else { main.setSample(0,i,audio[i*2]); main.setSample(1,i,audio[i*2+1]); }
+    }
+    for (int bus=1; bus<plugin.instance->getBusCount(true); ++bus) {
+        auto auxiliary = plugin.instance->getBusBuffer(plugin.buffer,true,bus);
+        for (int channel=0; channel<auxiliary.getNumChannels(); ++channel)
+            for (int i=0; i<frames; ++i)
+                auxiliary.setSample(channel,i,side ? (auxiliary.getNumChannels()==1 ? (side[i*2]+side[i*2+1])*.5f : side[i*2+channel%2]) : 0);
+    }
+    plugin.midi.clear();
+    for (int i = 0; i < midiCount; ++i) {
+        const uint8 bytes[3] = { (uint8)(midi[i] & 0xff), (uint8)((midi[i] >> 8) & 0x7f), (uint8)((midi[i] >> 16) & 0x7f) };
+        const int kind = bytes[0] & 0xf0;
+        if (kind < 0x80 || kind == 0xf0) continue;
+        plugin.midi.addEvent(bytes, kind == 0xc0 || kind == 0xd0 ? 2 : 3, 0);
+    }
+    AudioBuffer<float> block(plugin.buffer.getArrayOfWritePointers(),plugin.buffer.getNumChannels(),frames);
+    plugin.instance->processBlock(block,plugin.midi);
+    auto output=plugin.instance->getBusBuffer(block,false,0);
+    for (int i=0;i<frames;++i) { audio[i*2]=output.getSample(0,i);audio[i*2+1]=output.getSample(jmin(1,output.getNumChannels()-1),i); }
+}
+int vm_juce_has_bypass(void* p) { return static_cast<Plugin*>(p)->bypass != nullptr; }
+// Render thread: JUCE's hosted VST3 parameters queue the change for the next process call.
+void vm_juce_set_parameter(void* p,int index,float value) {
+    auto& parameters = static_cast<Plugin*>(p)->instance->getParameters();
+    if (index >= 0 && index < parameters.size()) parameters[index]->setValue(jlimit(0.0f, 1.0f, value));
+}
+const char* vm_juce_parameters(void* p) {
+    auto& plugin = *static_cast<Plugin*>(p);
+    Array<var> entries;
+    auto& parameters = plugin.instance->getParameters();
+    for (int i = 0; i < jmin(parameters.size(), 2048); ++i) {
+        auto* item = new DynamicObject();
+        item->setProperty("index", i);
+        item->setProperty("name", parameters[i]->getName(64));
+        item->setProperty("value", parameters[i]->getValue());
+        item->setProperty("automatable", parameters[i]->isAutomatable());
+        entries.add(var(item));
+    }
+    plugin.parameters = JSON::toString(var(entries), true).toStdString();
+    return plugin.parameters.c_str();
+}
+void vm_juce_set_touch_callback(void* p,void (*callback)(void*,int),void* context) {
+    auto& plugin = *static_cast<Plugin*>(p); plugin.touch.context = context; plugin.touch.callback = callback;
+}
 int vm_juce_side_channels(void* p) {
     auto& instance=*static_cast<Plugin*>(p)->instance;
     return instance.getTotalNumInputChannels()-instance.getMainBusNumInputChannels();

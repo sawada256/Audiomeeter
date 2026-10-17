@@ -22,13 +22,15 @@ B1/B2 can also be selected as internal input sources. Sending a return back to i
 
 Right-click INSERT to open the rack, scan installed plugins and select an ARM64 VST3 by name. Standard VST3 locations are scanned; the plugin's own activation remains necessary. Hardware inputs, VAIO/AUX and output buses support PRE/POST effects.
 
-Left-click the INSERT heading to bypass the chain; left-click an effect preview to toggle that effect; right-click it to open its editor. Use the rack to add, remove or edit effects. Closing an editor leaves processing active. Crashes/timeouts fall back to bypass; isolation is not a security sandbox or a guarantee against excessive CPU use.
+Left-click the INSERT heading to bypass the chain; left-click an effect preview to bypass that effect; right-click it to open its editor. Use the rack to add, remove, reorder or edit effects. These edits and sidechain changes apply without stopping audio.
+
+There are two bypass kinds. **Soft** (gray) uses the plugin's own VST3 bypass (or latency-matched dry audio) and keeps delay compensation unchanged. **Full** (black) removes the plugin from the path and its latency from compensation. Choose the click behavior under Audio Settings → Latency; Option-click uses the other kind. The rack also sets MIDI input to the plugin (off, all channels or one channel) and MIDI assignment of parameters. Crashed or overloaded plugins restart automatically by default (up to three times per minute). Closing an editor leaves processing active. Crashes/timeouts fall back to bypass; isolation is not a security sandbox or a guarantee against excessive CPU use.
 
 Sidechains can be unassigned (silence), an input or an output bus. Acyclic routes use the same block; cyclic routes use the preceding block. Block duration is `1000 × frames / sampleRate` ms (about 5.33 ms at 48 kHz/256 frames). Optional main/sidechain alignment delays the main signal to reduce their time difference. Plugin lookahead is additional latency.
 
 ## Settings and latency
 
-Audio settings expose sample rate, buffer size, channel mapping and delay compensation. Smaller buffers reduce latency but increase CPU/dropout risk; hardware may restrict supported values. Select left/right channels from the device's advertised channel count. Mappings are currently saved per bus, not as per-device presets.
+Audio settings expose sample rate, buffer size, channel mapping and delay compensation. "Hardware inputs" (3–5) and "Physical output buses" (A1–A3 to A1–A5) set the mixer size; hidden strips and buses release their devices and keep their assignment. Inputs and outputs on the A1 device itself are read and written directly in the master callback, without rings or clock correction. Smaller buffers reduce latency but increase CPU/dropout risk; hardware may restrict supported values. Select left/right channels from the device's advertised channel count. Mappings are currently saved per bus, not as per-device presets.
 
 Output-bus alignment delays faster buses to match the slowest plugin path. Disable it for independent low-latency monitoring. Plugin latency is shown in samples and milliseconds. Automatic device recovery and launch at login are configurable.
 
@@ -44,11 +46,19 @@ Configure always-visible/hold-to-show mode, corner and opacity. Select meters/fa
 
 Choose the recording source with SRC and format with FMT. Check the source meter before recording, then start/stop recording. The Finder button reveals recordings; the default folder is `~/Music/AudiomeeterRecordings`. Wait for finalization before starting another recording. Load a file into the player and select its destination. Very large playback files can consume substantial memory.
 
+## Macro buttons, scenes, routing matrix and diagnostics
+
+Menu → "Macro Buttons and Scenes…" creates buttons like the original Macro Buttons. Modes: push (run once), toggle and momentary. Toggle buttons with the same group number act as radio buttons. Script example: `Strip[0].A1 = 1; Strip[3].Mute = toggle; Bus[1].Gain -= 3; Scene = "Streaming"; Recorder.Record = 1; Button[2].State = 0`. Indices count from 0 in the visible order (hardware inputs, VAIO, AUX; A1..., B1, B2). Each button can have a key and a MIDI control.
+
+**Scenes** store routing, levels, Mute/Solo, EQ, dynamics and insert states, with a selectable recall scope per item. Devices and channel maps are never changed. Scenes can be recalled from buttons, macros and MIDI; buttons and scenes can be exported to and imported from a JSON file.
+
+"Routing Matrix…" shows every input against every output and toggles routes with a click. "Diagnostics…" shows processing load, deadline overruns, each path's mode (direct or ring + correction), ring underruns and overflows, clock correction (ppm), path latency, per-plugin processing time, late blocks and restarts, and recording drops.
+
 ## MIDI controllers
 
 Use Audio Settings → MIDI to assign knobs, faders, buttons and pads to mixer controls. Add an assignment, choose its target and control, press Learn and move the control. A fader's right-click menu also offers MIDI Learn.
 
-- Targets: input strips (fader, Mute/Solo, A1–B2 routing, PAN, PAD X/Y, COMP/GATE, 3-band EQ), output buses (fader, Mute, EQ, LIMIT) and the recorder (record, play/pause, stop).
+- Targets: input strips (fader, Mute/Solo, A1–B2 routing, PAN, PAD X/Y, COMP/GATE, 3-band EQ), output buses (fader, Mute, EQ, LIMIT), the recorder (record, play/pause, stop), VST3 parameters (from the list, or the one last moved in the plugin editor), macro buttons and scene recall.
 - Messages: CC, notes and pitch bend (Mackie-style 14-bit faders), from every connected MIDI input.
 - Value formats: absolute, relative (1/127, two's complement) and relative (64 center). Absolute controls with Pickup take effect only after reaching the current value.
 - Buttons: toggle on each press, or follow the value (127 = ON).

@@ -65,9 +65,10 @@ public struct SingleBusStripView: View {
 
     private func insertRow(_ slot: InsertConfig) -> some View {
         DualActionButton(title: slot.name, isActive: !slot.bypassed,
-                         onLeftClick: { appState.changeInsert(target: .bus(busID), id: slot.id, bypass: !slot.bypassed) },
-                         onRightClick: { appState.editInsert(target: .bus(busID), id: slot.id) }, fontSize: 8)
-            .frame(height: 16).help("\(slot.position.rawValue) · \(slot.name)")
+                         onLeftClick: { appState.toggleInsertBypass(target: .bus(busID), id: slot.id, alternate: NSEvent.modifierFlags.contains(.option)) },
+                         onRightClick: { appState.editInsert(target: .bus(busID), id: slot.id) }, fontSize: 8,
+                         inactiveStyle: slot.isSoftBypassed ? .soft : .off)
+            .frame(height: 16).help(InsertBypassUI.help(slot))
     }
 
     private var insertPreview: some View {
@@ -126,7 +127,7 @@ public struct MasterSectionView: View {
                     .buttonStyle(.plain).help(L10n.text("信号順序"))
             }
             HStack(alignment: .top, spacing: 2) {
-                ForEach(BusID.allCases) { bus in
+                ForEach(appState.visibleBuses) { bus in
                     let device = appState.outputDevices.first { $0.uid == appState.buses[bus]?.deviceUID }
                     VStack(spacing: 2) {
                         Menu {
@@ -148,7 +149,7 @@ public struct MasterSectionView: View {
                 }
             }
             HStack(spacing: 2) {
-                ForEach(BusID.allCases) { SingleBusStripView(busID: $0, appState: appState) }
+                ForEach(appState.visibleBuses) { SingleBusStripView(busID: $0, appState: appState) }
             }.frame(maxHeight: .infinity)
         }.padding(6).frame(height: MixerLayout.stripHeight, alignment: .top).background(VMTheme.consoleBg)
             .overlay(Rectangle().stroke(VMTheme.panelBorder, lineWidth: 1))
@@ -252,6 +253,9 @@ struct DualActionButton: NSViewRepresentable {
     let onRightClick: () -> Void
     var fontSize: CGFloat = 10
     var activeColor: NSColor = .systemCyan
+    /// Appearance while OFF: `.soft` (gray, latency-preserving bypass) or `.off` (black).
+    var inactiveStyle: InactiveStyle = .off
+    enum InactiveStyle { case off, soft }
     func makeNSView(context: Context) -> ActionButton { ActionButton() }
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: ActionButton, context: Context) -> CGSize? {
         guard let width = proposal.width else { return nil }
@@ -261,9 +265,10 @@ struct DualActionButton: NSViewRepresentable {
         view.cell?.lineBreakMode = .byTruncatingTail
         view.title = title; view.left = onLeftClick; view.right = onRightClick
         view.font = .boldSystemFont(ofSize: fontSize)
-        view.attributedTitle = NSAttributedString(string: title, attributes: [.font: view.font!, .foregroundColor: isActive ? NSColor.black : NSColor.systemCyan])
-        view.layer?.backgroundColor = (isActive ? activeColor : NSColor(white: 0.12, alpha: 1)).cgColor
-        view.layer?.borderColor = (isActive ? activeColor : NSColor(white: 0.25, alpha: 1)).cgColor
+        let soft = !isActive && inactiveStyle == .soft
+        view.attributedTitle = NSAttributedString(string: title, attributes: [.font: view.font!, .foregroundColor: isActive ? NSColor.black : soft ? NSColor(white: 0.12, alpha: 1) : NSColor(white: 0.42, alpha: 1)])
+        view.layer?.backgroundColor = (isActive ? activeColor : soft ? NSColor(white: 0.55, alpha: 1) : NSColor(white: 0.02, alpha: 1)).cgColor
+        view.layer?.borderColor = (isActive ? activeColor : soft ? NSColor(white: 0.7, alpha: 1) : NSColor(white: 0.18, alpha: 1)).cgColor
         view.toolTip = L10n.text("左クリック: ON/OFF、右クリック: 編集")
         view.setAccessibilityLabel(title); view.setAccessibilityValue(isActive ? "ON" : "OFF")
     }

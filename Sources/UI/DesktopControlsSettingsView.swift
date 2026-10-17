@@ -3,7 +3,7 @@ import AppKit
 
 struct DesktopControlsSettingsView: View {
     @ObservedObject var state: AppState
-    private let channels = StripID.allCases.map { InsertTarget.strip($0) } + BusID.allCases.map { InsertTarget.bus($0) }
+    private var channels: [InsertTarget] { state.visibleStrips.map { InsertTarget.strip($0) } + state.visibleBuses.map { InsertTarget.bus($0) } }
     private func binding<T>(_ key: WritableKeyPath<DesktopControlsPreferences, T>) -> Binding<T> {
         Binding(get: { state.desktopControls[keyPath: key] }, set: { value in
             var preferences = state.desktopControls; preferences[keyPath: key] = value; state.setDesktopControls(preferences)

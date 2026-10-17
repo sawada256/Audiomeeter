@@ -8,11 +8,12 @@ A stereo mixer for Apple Silicon / macOS 14+. Private development build with unn
 
 ## Features
 
-- Three hardware plus VAIO/AUX inputs; A1–A3/B1/B2; channel mapping, PAN/EQ/dynamics.
+- Three to five hardware plus VAIO/AUX inputs; A1–A3 up to A5, B1/B2; channel mapping, PAN/EQ/dynamics.
 - ARM64 VST3 PRE/POST inserts, isolated workers, sidechains and latency compensation.
 - Dedicated duplex VAIO/B1 and AUX/B2 HAL devices with per-app trims.
 - EQ presets/overlaid spectrum; selectable input pads including experimental formant.
-- MIDI controller mapping (MIDI Learn, relative encoders, pickup).
+- MIDI controller mapping (MIDI Learn, relative encoders, pickup, VST3 parameters).
+- Macro buttons and scenes, routing matrix and diagnostics.
 - Recording/playback, hotkeys, floating mini mixer, device recovery and launch at login.
 - Japanese by default, selectable English. OS/third-party editors use their own languages.
 

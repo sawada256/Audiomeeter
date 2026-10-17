@@ -19,6 +19,7 @@ public final class AudioInputIO {
     let deviceSampleRate: Double
     let deviceBufferSize: UInt32
     private let engineSampleRate: Double
+    var correctionPPM: Double { resampler.correctionPPM }
 
     public init(deviceID: AudioObjectID, engineRate: Double, ringBuffer: StereoRingBuffer, channelOffset: Int = 0, leftChannel: Int? = nil, rightChannel: Int? = nil, engineFrames: UInt32 = 256) {
         self.deviceID = deviceID
@@ -117,6 +118,7 @@ public final class AudioOutputIO {
     let deviceSampleRate: Double
     let deviceBufferSize: UInt32
     private let engineSampleRate: Double
+    var correctionPPM: Double { resampler.correctionPPM }
 
     public init(deviceID: AudioObjectID, engineRate: Double, ringBuffer: StereoRingBuffer, channelOffset: Int = 0, leftChannel: Int? = nil, rightChannel: Int? = nil, engineFrames: UInt32 = 256) {
         self.deviceID = deviceID

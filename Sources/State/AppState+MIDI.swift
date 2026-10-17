@@ -45,7 +45,36 @@ extension AppState {
     func cancelMIDILearn() { midiLearnMappingID = nil }
 
     func midiTargetName(_ target: Int) -> String {
-        target == midiRecorderTarget ? L10n.text("レコーダー") : (InsertTarget.from(target)?.name ?? "?")
+        switch target {
+        case midiRecorderTarget: return L10n.text("レコーダー")
+        case midiPluginTarget: return "VST3"
+        case midiMacroTarget: return L10n.text("マクロ")
+        case midiSceneTarget: return L10n.text("シーン")
+        default: return InsertTarget.from(target)?.name ?? "?"
+        }
+    }
+    /// Every hosted insert, labelled for pickers.
+    var midiPluginChoices: [(id: UUID, label: String)] {
+        InsertTarget.all.filter(isVisible).flatMap { target in (insertConfigs[target] ?? []).map { ($0.id, "\(target.name) · \($0.name)") } }
+    }
+    func pluginSlot(_ id: UUID?) -> HostedInsert? {
+        guard let id else { return nil }
+        return engine.inserts.values.lazy.flatMap { $0 }.first { $0.config.id == id }
+    }
+    func pluginParameters(_ id: UUID?) -> [PluginParameterInfo] { pluginSlot(id)?.parameters ?? [] }
+    /// DAW-style "learn last touched": assigns the parameter last moved in the plugin's editor.
+    func useLastTouchedParameter(_ mapping: UUID) {
+        guard let current = midiMappings.first(where: { $0.id == mapping }), let touched = pluginSlot(current.pluginInsertID)?.lastTouchedParameter() else {
+            audioError = L10n.text("プラグインの画面でパラメーターを動かしてから押してください。"); return
+        }
+        updateMIDIMapping(mapping) { $0.pluginParameter = touched.index }
+    }
+    /// Creates a mapping for a plugin parameter and starts MIDI learn.
+    func beginPluginParameterLearn(insert: UUID, parameter: Int?) {
+        var mapping = MIDIMapping(target: midiPluginTarget, parameter: .pluginParameter)
+        mapping.pluginInsertID = insert; mapping.pluginParameter = parameter
+        midiMappings.append(mapping); saveSettings()
+        midiLearnMappingID = mapping.id
     }
 
     func handleMIDI(_ events: [MIDIEvent]) {
@@ -73,6 +102,15 @@ extension AppState {
             let pressed = event.raw >= 64 || (event.trigger.kind == .note && event.raw > 0)
             let wasPressed = midiButtonsDown[mapping.id] ?? false
             midiButtonsDown[mapping.id] = pressed
+            if parameter == .macroButton {
+                // The macro's own mode (push/toggle/momentary) decides what press and release do.
+                if pressed != wasPressed, let id = mapping.macroID { macroButton(id, down: pressed) }
+                return
+            }
+            if parameter == .recallScene {
+                if pressed && !wasPressed, let id = mapping.sceneID { recallScene(id) }
+                return
+            }
             guard let current = buttonValue(mapping),
                   let next = MIDIMappingMath.buttonState(pressed: pressed, wasPressed: wasPressed, current: current, mode: mapping.button) else { return }
             setButton(mapping, next)
@@ -119,6 +157,9 @@ extension AppState {
     }
 
     private func continuousValue(_ mapping: MIDIMapping) -> Float? {
+        if mapping.parameter == .pluginParameter, let index = mapping.pluginParameter {
+            return pluginSlot(mapping.pluginInsertID)?.parameterValue(index)
+        }
         if let bus = bus(mapping) { return mapping.parameter == .gain ? buses[bus]?.gainDB : nil }
         guard let strip = strip(mapping), let settings = strips[strip] else { return nil }
         switch mapping.parameter {
@@ -136,6 +177,9 @@ extension AppState {
     }
 
     private func setContinuous(_ mapping: MIDIMapping, _ value: Float) {
+        if mapping.parameter == .pluginParameter, let index = mapping.pluginParameter {
+            pluginSlot(mapping.pluginInsertID)?.setParameter(index, value); return
+        }
         if let bus = bus(mapping) { if mapping.parameter == .gain { setBusGain(bus: bus, gainDB: value) }; return }
         guard let strip = strip(mapping) else { return }
         switch mapping.parameter {

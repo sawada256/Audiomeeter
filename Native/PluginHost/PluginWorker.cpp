@@ -25,13 +25,19 @@ void vm_juce_restore(void*,const char*);
 int vm_juce_latency(void*);
 int vm_juce_side_channels(void*);
 int vm_juce_editor_visible(void*);
+void vm_juce_process_ex(void*,float*,const float*,int,const uint32_t*,int,int);
+int vm_juce_has_bypass(void*);
+void vm_juce_set_parameter(void*,int,float);
+const char* vm_juce_parameters(void*);
+void vm_juce_set_touch_callback(void*,void(*)(void*,int),void*);
 }
 class PluginWorker final : public JUCEApplication, private Timer {
     void* plugin=nullptr;
     VMWorkerShared* shared=nullptr;
     sem_t* wake=SEM_FAILED;
     int fd=-1;
-    File metadata;
+    File metadata, parameterList;
+    uint32_t midiScratch[VMW_MIDI_EVENTS];
     std::thread audio;
     std::atomic<bool> quitting{false};
     uint64_t editorSeen=0, snapshotSeen=0;
@@ -60,6 +66,7 @@ public:
         if(args.size()!=1) { quit();return; }
         auto config=JSON::parse(File(args[0].unquoted()));
         metadata=File(config["metadata"].toString());
+        parameterList=metadata.getSiblingFile("parameters.json");
         const int parent=(int)config["parentPID"];
         std::thread([parent] {
             int queue=kqueue(); struct kevent event;
@@ -89,6 +96,14 @@ public:
         if(latency<0||latency>VMW_MAX_LATENCY) { __atomic_store_n(&shared->ready,2,__ATOMIC_RELEASE);quit();return; }
         __atomic_store_n(&shared->latency,(uint32_t)latency,__ATOMIC_RELEASE);
         __atomic_store_n(&shared->sideChannels,(uint32_t)vm_juce_side_channels(plugin),__ATOMIC_RELEASE);
+        __atomic_store_n(&shared->hasBypassParameter,(uint32_t)vm_juce_has_bypass(plugin),__ATOMIC_RELEASE);
+        // Plugin-UI edits are reported so the host can offer "learn last touched parameter".
+        vm_juce_set_touch_callback(plugin,[](void* context,int index) {
+            auto* target=static_cast<VMWorkerShared*>(context);
+            __atomic_store_n(&target->touchedParameter,(uint32_t)index,__ATOMIC_RELEASE);
+            __atomic_add_fetch(&target->touchedSerial,1,__ATOMIC_RELEASE);
+        },shared);
+        parameterList.replaceWithText(String::fromUTF8(vm_juce_parameters(plugin)));
         saveState();
         audio=std::thread([this] { render(); });
         __atomic_store_n(&shared->ready,1,__ATOMIC_RELEASE);
@@ -108,7 +123,18 @@ public:
             uint32_t submitted=1;
             if(!__atomic_compare_exchange_n(&next->state,&submitted,2,false,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE))continue;
             memcpy(next->output,next->input,shared->quantum*2*sizeof(float));
-            vm_juce_process_side(plugin,next->output,next->side,shared->quantum);
+            const uint64_t begin=mach_absolute_time();
+            // Parameter changes from MIDI learn, applied before the block they affect.
+            uint32_t write=__atomic_load_n(&shared->parameterWrite,__ATOMIC_ACQUIRE), read=__atomic_load_n(&shared->parameterRead,__ATOMIC_RELAXED);
+            for(;read!=write;++read) { auto& change=shared->parameters[read%VMW_PARAM_EVENTS]; vm_juce_set_parameter(plugin,(int)change.index,change.value); }
+            __atomic_store_n(&shared->parameterRead,read,__ATOMIC_RELEASE);
+            int midiCount=0;
+            write=__atomic_load_n(&shared->midiWrite,__ATOMIC_ACQUIRE); read=__atomic_load_n(&shared->midiRead,__ATOMIC_RELAXED);
+            for(;read!=write&&midiCount<VMW_MIDI_EVENTS;++read) midiScratch[midiCount++]=shared->midi[read%VMW_MIDI_EVENTS];
+            __atomic_store_n(&shared->midiRead,read,__ATOMIC_RELEASE);
+            vm_juce_process_ex(plugin,next->output,next->side,shared->quantum,midiScratch,midiCount,(int)__atomic_load_n(&shared->bypass,__ATOMIC_ACQUIRE));
+            mach_timebase_info_data_t base; mach_timebase_info(&base);
+            __atomic_store_n(&shared->renderMicros,(uint32_t)((mach_absolute_time()-begin)*base.numer/jmax(1u,base.denom)/1000),__ATOMIC_RELEASE);
             int latency=vm_juce_latency(plugin);
             __atomic_store_n(&shared->latency,(uint32_t)jmax(0,latency),__ATOMIC_RELEASE);
             __atomic_store_n(&next->state,3,__ATOMIC_RELEASE);

@@ -101,7 +101,7 @@ import Foundation
         var inserts: [InsertTarget: [InsertConfig]] = [.strip(.virtualVAIO): [config]]
         var graph = SidechainRenderGraph(strips: strips, inserts: inserts)
         precondition(!graph.usesPreviousBlock(source: .B1, target: .strip(.virtualVAIO)))
-        precondition(graph.order.firstIndex(of: 8)! < graph.order.firstIndex(of: 3)!)
+        precondition(graph.order.firstIndex(of: MixerTopology.node(.B1))! < graph.order.firstIndex(of: 3)!)
         strips[.virtualVAIO]?.routing.b1 = true
         graph = SidechainRenderGraph(strips: strips, inserts: inserts)
         precondition(graph.usesPreviousBlock(source: .B1, target: .strip(.virtualVAIO)))

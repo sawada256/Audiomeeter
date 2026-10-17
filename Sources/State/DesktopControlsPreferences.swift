@@ -68,7 +68,9 @@ struct DesktopControlsPreferences: Codable, Equatable {
         reverseMouseScroll = reverseMouseScroll ?? true
         gainStep = gainStep.isFinite ? min(12, max(0.1, gainStep)) : 1
         overlayOpacity = overlayOpacity.isFinite ? min(1, max(0.15, overlayOpacity)) : 0.9
-        if !([0,1,2,3,4,100,101,102,103,104].contains(mediaTarget)) { mediaTarget = 0 }
-        hotkeys = Array(hotkeys.filter { [0,1,2,3,4,100,101,102,103,104].contains($0.target) }.prefix(30))
+        // Bus ids 0...6 (A1-A5, B1, B2) and strip ids 100...106 (IN 1-5, VAIO, AUX).
+        let valid = Set(Array(0...6) + Array(100...106))
+        if !valid.contains(mediaTarget) { mediaTarget = 0 }
+        hotkeys = Array(hotkeys.filter { valid.contains($0.target) }.prefix(30))
     }
 }

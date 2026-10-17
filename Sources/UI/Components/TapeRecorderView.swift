@@ -180,6 +180,11 @@ public struct TapeRecorderView: View {
                         .buttonStyle(PlainButtonStyle())
                     }
 
+                    if recorderPlayer.recordingDroppedFrames > 0 {
+                        Text(L10n.text("録音バッファ不足: {0} フレーム欠落（ディスクが遅い可能性）", [String(recorderPlayer.recordingDroppedFrames)]))
+                            .font(.system(size: 9, weight: .bold)).foregroundColor(.orange)
+                    }
+
                     // Recording Source & Format Pickers
                     HStack(spacing: 8) {
                         // Source
@@ -189,7 +194,7 @@ public struct TapeRecorderView: View {
                                 .foregroundColor(VMTheme.textSecondary)
 
                             Picker("", selection: $recorderPlayer.recordingSource) {
-                                ForEach(RecordingSource.allCases) { src in
+                                ForEach(appState.visibleRecordingSources) { src in
                                     Text(L10n.text(src.displayName)).tag(src)
                                 }
                             }
@@ -228,7 +233,7 @@ public struct TapeRecorderView: View {
                         .foregroundColor(VMTheme.textSecondary)
 
                     HStack(spacing: 3) {
-                        ForEach(BusID.allCases) { bus in
+                        ForEach(appState.visibleBuses) { bus in
                             let isRouted = recorderPlayer.playbackRouting[bus] ?? false
                             Button(action: {
                                 recorderPlayer.playbackRouting[bus] = !isRouted
@@ -317,20 +322,7 @@ public struct TapeRecorderView: View {
 private struct RecorderSourceMeter: View {
     @ObservedObject var meters: MixerMeterStore
     let source: RecordingSource
-    private var target: InsertTarget {
-        switch source {
-        case .busA1: return .bus(.A1)
-        case .busA2: return .bus(.A2)
-        case .busA3: return .bus(.A3)
-        case .busB1: return .bus(.B1)
-        case .busB2: return .bus(.B2)
-        case .strip1: return .strip(.hardware1)
-        case .strip2: return .strip(.hardware2)
-        case .strip3: return .strip(.hardware3)
-        case .stripVAIO: return .strip(.virtualVAIO)
-        case .stripAUX: return .strip(.virtualAUX)
-        }
-    }
+    private var target: InsertTarget { source.target }
     var body: some View { CompactStereoMeter(level: meters.level(target)) }
 }
 

@@ -43,6 +43,40 @@ enum AudioConfigurationError: LocalizedError { case message(String); var errorDe
         for _ in 0..<4 { usleep(11000); a.update(repeating: 1, count: 1024); gain.process(a, sidechain: nil, upstreamLatency: 0, frames: 512) }
         precondition(abs(a[0] - 0.5) < 0.0001 && gain.status.isEmpty, "Worker must resume processing after resync")
         fflush(stdout); print("Bypass resume drops the stale wet block and resynchronizes the worker")
+        // Soft (latency-preserving) bypass: the worker keeps running, PDC is unchanged and the
+        // output is the dry signal (the plugin's own bypass, or latency-matched dry).
+        func settle(_ value: Float, blocks: Int = 4) -> Float {
+            for _ in 0..<blocks { usleep(11000); a.update(repeating: value, count: 1024); gain.process(a, sidechain: nil, upstreamLatency: 0, frames: 512) }
+            return a[0]
+        }
+        let activeLatency = gain.latency
+        gain.setBypass(.latency)
+        precondition(!gain.fullyBypassed && gain.latency == activeLatency, "Soft bypass keeps the slot in the path and its latency")
+        precondition(abs(settle(1) - 1) < 0.0001, "Soft bypass passes the dry signal")
+        gain.setBypass(nil)
+        precondition(abs(settle(1) - 0.5) < 0.0001, "Leaving soft bypass restores processing")
+        gain.setBypass(.full)
+        precondition(gain.fullyBypassed && gain.config.isFullyBypassed)
+        gain.setBypass(nil)
+        // Parameters: listed from the worker and set from the host (MIDI learn path).
+        gain.refresh()
+        precondition(gain.parameters.contains { $0.name == "Gain" }, "Worker must publish its parameter list: \(gain.parameters)")
+        let gainIndex = gain.parameters.first { $0.name == "Gain" }!.index
+        gain.setParameter(gainIndex, 1)
+        precondition(abs(settle(0.4) - 0.4) < 0.0001 && gain.parameterValue(gainIndex) == 1, "Host parameter changes reach the plugin")
+        gain.setParameter(gainIndex, 0.5)
+        precondition(abs(settle(0.4) - 0.2) < 0.0001)
+        // MIDI input ring: pushes are drained by the render thread.
+        gain.setMIDIInput(0)
+        var accepted = 0
+        for round in 0..<3 {
+            for note in 0..<300 { MIDIPluginRouter.shared.forward(status: 0x90, data1: UInt8(note % 128), data2: 100); accepted += 1 }
+            _ = settle(0.4, blocks: 2 + round)
+        }
+        precondition(!MIDIPluginRouter.shared.isEmpty && accepted == 900 && gain.status.isEmpty, "MIDI forwarding must not disturb the worker")
+        gain.setMIDIInput(nil)
+        precondition(MIDIPluginRouter.shared.isEmpty)
+        fflush(stdout); print("Soft bypass keeps latency, parameters list/set, MIDI input ring")
         side.reset()
         for i in 0..<6 {
             b.update(repeating: i == 0 ? 1 : 0,count:1024)

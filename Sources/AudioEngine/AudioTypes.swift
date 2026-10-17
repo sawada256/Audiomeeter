@@ -5,6 +5,9 @@ public enum BusID: Int, CaseIterable, Identifiable, Codable {
     case A1 = 0
     case A2 = 1
     case A3 = 2
+    // Optional physical buses (Potato-sized layout). Raw values keep B1/B2 stable in saved settings.
+    case A4 = 5
+    case A5 = 6
     case B1 = 3
     case B2 = 4
 
@@ -15,13 +18,19 @@ public enum BusID: Int, CaseIterable, Identifiable, Codable {
         case .A1: return "A1"
         case .A2: return "A2"
         case .A3: return "A3"
+        case .A4: return "A4"
+        case .A5: return "A5"
         case .B1: return "B1"
         case .B2: return "B2"
         }
     }
 
     public var isPhysical: Bool {
-        return self == .A1 || self == .A2 || self == .A3
+        return !isVirtual
+    }
+    /// 0-based position among physical buses (A1 = 0), or nil for B buses.
+    public var physicalIndex: Int? {
+        switch self { case .A1: return 0; case .A2: return 1; case .A3: return 2; case .A4: return 3; case .A5: return 4; default: return nil }
     }
 
     public var isVirtual: Bool {
@@ -33,6 +42,8 @@ public enum BusID: Int, CaseIterable, Identifiable, Codable {
         case .A1: return "HARDWARE OUT 1 (Master Clock)"
         case .A2: return "HARDWARE OUT 2"
         case .A3: return "HARDWARE OUT 3"
+        case .A4: return "HARDWARE OUT 4"
+        case .A5: return "HARDWARE OUT 5"
         case .B1: return "VIRTUAL OUT B1 (VAIO)"
         case .B2: return "VIRTUAL OUT B2 (AUX)"
         }
@@ -43,6 +54,9 @@ public enum StripID: Int, CaseIterable, Identifiable, Codable {
     case hardware1 = 0
     case hardware2 = 1
     case hardware3 = 2
+    // Optional hardware strips; raw values keep VAIO/AUX stable in saved settings.
+    case hardware4 = 5
+    case hardware5 = 6
     case virtualVAIO = 3
     case virtualAUX = 4
 
@@ -53,6 +67,8 @@ public enum StripID: Int, CaseIterable, Identifiable, Codable {
         case .hardware1: return "HARDWARE INPUT 1"
         case .hardware2: return "HARDWARE INPUT 2"
         case .hardware3: return "HARDWARE INPUT 3"
+        case .hardware4: return "HARDWARE INPUT 4"
+        case .hardware5: return "HARDWARE INPUT 5"
         case .virtualVAIO: return "AUDIOMEETER VAIO"
         case .virtualAUX: return "AUDIOMEETER AUX"
         }
@@ -63,13 +79,19 @@ public enum StripID: Int, CaseIterable, Identifiable, Codable {
         case .hardware1: return "IN 1"
         case .hardware2: return "IN 2"
         case .hardware3: return "IN 3"
+        case .hardware4: return "IN 4"
+        case .hardware5: return "IN 5"
         case .virtualVAIO: return "VAIO"
         case .virtualAUX: return "AUX"
         }
     }
 
     public var isHardware: Bool {
-        return self == .hardware1 || self == .hardware2 || self == .hardware3
+        return !isVirtual
+    }
+    /// 0-based position among hardware strips, or nil for virtual strips.
+    public var hardwareIndex: Int? {
+        switch self { case .hardware1: return 0; case .hardware2: return 1; case .hardware3: return 2; case .hardware4: return 3; case .hardware5: return 4; default: return nil }
     }
 
     public var isVirtual: Bool {
@@ -114,13 +136,22 @@ public struct RoutingMatrix: Codable, Equatable {
     public var a3: Bool
     public var b1: Bool
     public var b2: Bool
+    // Optional so settings saved before A4/A5 existed still decode.
+    public var a4: Bool?
+    public var a5: Bool?
 
-    public init(a1: Bool = false, a2: Bool = false, a3: Bool = false, b1: Bool = false, b2: Bool = false) {
+    public init(a1: Bool = false, a2: Bool = false, a3: Bool = false, b1: Bool = false, b2: Bool = false, a4: Bool = false, a5: Bool = false) {
         self.a1 = a1
         self.a2 = a2
         self.a3 = a3
         self.b1 = b1
         self.b2 = b2
+        self.a4 = a4
+        self.a5 = a5
+    }
+
+    public static func == (lhs: RoutingMatrix, rhs: RoutingMatrix) -> Bool {
+        BusID.allCases.allSatisfy { lhs[$0] == rhs[$0] }
     }
 
     public subscript(bus: BusID) -> Bool {
@@ -129,6 +160,8 @@ public struct RoutingMatrix: Codable, Equatable {
             case .A1: return a1
             case .A2: return a2
             case .A3: return a3
+            case .A4: return a4 ?? false
+            case .A5: return a5 ?? false
             case .B1: return b1
             case .B2: return b2
             }
@@ -138,6 +171,8 @@ public struct RoutingMatrix: Codable, Equatable {
             case .A1: a1 = newValue
             case .A2: a2 = newValue
             case .A3: a3 = newValue
+            case .A4: a4 = newValue
+            case .A5: a5 = newValue
             case .B1: b1 = newValue
             case .B2: b2 = newValue
             }
@@ -336,6 +371,14 @@ public enum BusProcessingStage: String, Codable, CaseIterable, Identifiable {
     case .limiter: return "LIMIT"
     } }
     public static let standard: [Self] = [.preInserts, .fader, .postInserts, .eq, .limiter]
+    /// 3 bits per stage, so the render callback reads the order from one atomic word.
+    static func packed(_ order: [Self]) -> UInt64 {
+        order.enumerated().reduce(0) { $0 | UInt64($1.element.code) << UInt64(3 * $1.offset) }
+    }
+    static func unpacked(_ value: UInt64, at index: Int) -> Self {
+        switch (value >> UInt64(3 * index)) & 7 { case 0: return .preInserts; case 1: return .eq; case 2: return .fader; case 3: return .limiter; default: return .postInserts }
+    }
+    private var code: Int { switch self { case .preInserts: return 0; case .eq: return 1; case .fader: return 2; case .limiter: return 3; case .postInserts: return 4 } }
     public static func isValid(_ order: [Self]) -> Bool {
         guard order.count == 5, Set(order).count == 5,
               let pre = order.firstIndex(of: .preInserts), let fader = order.firstIndex(of: .fader), let post = order.firstIndex(of: .postInserts) else { return false }
@@ -421,4 +464,24 @@ public enum StereoPanControl {
         let percentage = Int((abs(value) * 100).rounded())
         return percentage == 0 ? "C" : "\(value < 0 ? "L" : "R")\(percentage)"
     }
+}
+
+public enum InsertPosition: String, Codable, CaseIterable { case pre = "PRE", post = "POST" }
+public enum InsertTarget: Hashable, Identifiable {
+    case bus(BusID), strip(StripID)
+    public var id: Int { switch self { case .bus(let bus): return bus.rawValue; case .strip(let strip): return 100 + strip.rawValue } }
+    var name: String { switch self { case .bus(let bus): return bus.name; case .strip(let strip): return strip.shortName } }
+    static var all: [InsertTarget] { BusID.allCases.map { .bus($0) } + StripID.allCases.map { .strip($0) } }
+    static func from(_ id: Int) -> InsertTarget? {
+        if id >= 100, let strip = StripID(rawValue: id-100) { return .strip(strip) }
+        if let bus = BusID(rawValue: id) { return .bus(bus) }
+        return nil
+    }
+}
+
+/// Latency-preserving ("soft") bypass keeps the worker and PDC running; full bypass
+/// removes the plugin from the signal path and its latency from compensation.
+public enum InsertBypassMode: String, Codable, CaseIterable {
+    case latency, full
+    var other: Self { self == .latency ? .full : .latency }
 }

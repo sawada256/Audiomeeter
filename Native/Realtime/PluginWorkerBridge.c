@@ -123,3 +123,34 @@ void vmw_process(void* handle,float* audio,const float* side,int frames) {
 }
 
 void vmw_seed_latency(void* handle,int latency) { VMWorkerProxy* p=handle;if(p)__atomic_store_n(&p->shared->latency,(uint32_t)fmax(0,fmin(VMW_MAX_LATENCY,latency)),__ATOMIC_RELEASE); }
+
+// Soft bypass keeps the worker running so latency and plugin state stay continuous.
+void vmw_set_soft_bypass(void* handle,int enabled) { VMWorkerProxy* p=handle;if(p)__atomic_store_n(&p->shared->bypass,(uint32_t)(enabled?1:0),__ATOMIC_RELEASE); }
+int vmw_has_bypass_parameter(void* handle) { VMWorkerProxy* p=handle;return p ? (int)__atomic_load_n(&p->shared->hasBypassParameter,__ATOMIC_ACQUIRE) : 0; }
+uint32_t vmw_render_micros(void* handle) { VMWorkerProxy* p=handle;return p ? __atomic_load_n(&p->shared->renderMicros,__ATOMIC_ACQUIRE) : 0; }
+uint32_t vmw_touched(void* handle,uint32_t* serial) {
+    VMWorkerProxy* p=handle;if(!p){ if(serial)*serial=0; return 0; }
+    if(serial)*serial=__atomic_load_n(&p->shared->touchedSerial,__ATOMIC_ACQUIRE);
+    return __atomic_load_n(&p->shared->touchedParameter,__ATOMIC_ACQUIRE);
+}
+// Single producer (the CoreMIDI input thread). Returns 0 when the ring is full.
+int vmw_midi_push(void* handle,uint32_t message) {
+    VMWorkerProxy* p=handle;if(!p||__atomic_load_n(&p->shared->ready,__ATOMIC_ACQUIRE)!=1)return 0;
+    uint32_t write=__atomic_load_n(&p->shared->midiWrite,__ATOMIC_RELAXED);
+    uint32_t read=__atomic_load_n(&p->shared->midiRead,__ATOMIC_ACQUIRE);
+    if(write-read>=VMW_MIDI_EVENTS)return 0;
+    p->shared->midi[write%VMW_MIDI_EVENTS]=message;
+    __atomic_store_n(&p->shared->midiWrite,write+1,__ATOMIC_RELEASE);
+    return 1;
+}
+// Single producer (the host main thread). Returns 0 when the ring is full.
+int vmw_parameter_push(void* handle,uint32_t index,float value) {
+    VMWorkerProxy* p=handle;if(!p||!isfinite(value))return 0;
+    uint32_t write=__atomic_load_n(&p->shared->parameterWrite,__ATOMIC_RELAXED);
+    uint32_t read=__atomic_load_n(&p->shared->parameterRead,__ATOMIC_ACQUIRE);
+    if(write-read>=VMW_PARAM_EVENTS)return 0;
+    VMWorkerParameter* slot=&p->shared->parameters[write%VMW_PARAM_EVENTS];
+    slot->index=index; slot->value=value<0?0:value>1?1:value;
+    __atomic_store_n(&p->shared->parameterWrite,write+1,__ATOMIC_RELEASE);
+    return 1;
+}

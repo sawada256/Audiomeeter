@@ -36,7 +36,7 @@ struct MiniMixerView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack { Text(L10n.text("MINI MIXER")).font(.system(size: 9, weight: .bold)); Spacer(); Text("dB").font(.system(size: 9)).foregroundStyle(.secondary) }
-            ForEach(InsertTarget.all) { target in
+            ForEach(InsertTarget.all.filter(state.isVisible)) { target in
                 let options = preferences.overlayChannels[target.id] ?? MiniMixerChannel()
                 let muted = isMuted(target)
                 if options.fader || options.meter {

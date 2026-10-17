@@ -1,4 +1,5 @@
 import Foundation
+import VMNative
 
 /// Real-time sample rate converter with Adaptive Clock Drift Compensation (PID / EMA Controller)
 public final class AdaptiveResampler {
@@ -17,6 +18,9 @@ public final class AdaptiveResampler {
     private var inputFrameRemainder: Double = 0.0
     private var sourcePosition: Double = 0
     private let history = UnsafeMutablePointer<Float>.allocate(capacity: 8)
+    /// Current drift correction in parts per million (diagnostics; written by the IO thread).
+    private let correctionBits = vm_counter_create()!
+    public var correctionPPM: Double { Double(bitPattern: vm_counter_load(correctionBits)) }
 
     public init(sourceRate: Double, targetRate: Double, targetFill: Float = 0.5) {
         self.targetFillLevel = targetFill
@@ -29,7 +33,7 @@ public final class AdaptiveResampler {
 
     }
 
-    deinit { history.deallocate() }
+    deinit { history.deallocate(); vm_counter_destroy(correctionBits) }
 
     public func updateRates(sourceRate: Double, targetRate: Double) {
         if abs(sourceSampleRate - sourceRate) > 1.0 || abs(targetSampleRate - targetRate) > 1.0 {
@@ -61,6 +65,7 @@ public final class AdaptiveResampler {
         let correction = (kp * error) + (ki * integralError)
         let clampedCorrection = max(-0.005, min(0.005, correction))
         currentRatio = nominalRatio * (1.0 - clampedCorrection)
+        vm_counter_store(correctionBits, (-clampedCorrection * 1_000_000).bitPattern)
     }
 
     /// Number of target-clock frames to produce for a source-clock block.

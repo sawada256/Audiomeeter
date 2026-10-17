@@ -47,18 +47,22 @@ struct MIDIEvent: Equatable {
     }
 }
 
-/// Global recorder transport uses this pseudo target; mixer targets reuse InsertTarget ids.
+/// Pseudo targets; mixer targets reuse InsertTarget ids (buses 0...6, strips 100...106).
 let midiRecorderTarget = -1
+let midiPluginTarget = -2
+let midiMacroTarget = -3
+let midiSceneTarget = -4
 
 enum MIDIControlParameter: String, Codable, CaseIterable {
     case gain, mute, solo, pan, padX, padY, comp, gate, eqLow, eqMid, eqHigh
-    case routeA1, routeA2, routeA3, routeB1, routeB2
+    case routeA1, routeA2, routeA3, routeA4, routeA5, routeB1, routeB2
     case busEQ, limiter
     case record, play, stop
+    case pluginParameter, macroButton, recallScene
 
     var isButton: Bool {
         switch self {
-        case .mute, .solo, .routeA1, .routeA2, .routeA3, .routeB1, .routeB2, .busEQ, .limiter, .record, .play, .stop: return true
+        case .mute, .solo, .routeA1, .routeA2, .routeA3, .routeA4, .routeA5, .routeB1, .routeB2, .busEQ, .limiter, .record, .play, .stop, .macroButton, .recallScene: return true
         default: return false
         }
     }
@@ -78,6 +82,7 @@ enum MIDIControlParameter: String, Codable, CaseIterable {
         case .pan, .padX, .padY: return 0.0625 // Larger than the PAN centre snap.
         case .comp, .gate: return 0.1
         case .eqLow, .eqMid, .eqHigh: return 0.25
+        case .pluginParameter: return 1.0 / 128
         default: return 1
         }
     }
@@ -97,6 +102,8 @@ enum MIDIControlParameter: String, Codable, CaseIterable {
         case .routeA1: return "→ A1"
         case .routeA2: return "→ A2"
         case .routeA3: return "→ A3"
+        case .routeA4: return "→ A4"
+        case .routeA5: return "→ A5"
         case .routeB1: return "→ B1"
         case .routeB2: return "→ B2"
         case .busEQ: return "EQ ON/OFF"
@@ -104,17 +111,26 @@ enum MIDIControlParameter: String, Codable, CaseIterable {
         case .record: return L10n.text("録音 開始／停止")
         case .play: return L10n.text("再生／一時停止")
         case .stop: return L10n.text("停止")
+        case .pluginParameter: return L10n.text("パラメーター")
+        case .macroButton: return L10n.text("マクロボタン")
+        case .recallScene: return L10n.text("シーン呼出")
         }
     }
     var routedBus: BusID? {
-        switch self { case .routeA1: return .A1; case .routeA2: return .A2; case .routeA3: return .A3; case .routeB1: return .B1; case .routeB2: return .B2; default: return nil }
+        switch self { case .routeA1: return .A1; case .routeA2: return .A2; case .routeA3: return .A3; case .routeA4: return .A4; case .routeA5: return .A5; case .routeB1: return .B1; case .routeB2: return .B2; default: return nil }
     }
     /// Parameters that exist on a target (InsertTarget id, or midiRecorderTarget).
     static func available(for target: Int) -> [Self] {
-        if target == midiRecorderTarget { return [.record, .play, .stop] }
+        switch target {
+        case midiRecorderTarget: return [.record, .play, .stop]
+        case midiPluginTarget: return [.pluginParameter]
+        case midiMacroTarget: return [.macroButton]
+        case midiSceneTarget: return [.recallScene]
+        default: break
+        }
         if target < 100 { return [.gain, .mute, .busEQ, .limiter] }
-        let routes: [Self] = [.routeA1, .routeA2, .routeA3, .routeB1, .routeB2]
-        if target >= 103 { return [.gain, .mute, .solo, .pan, .eqLow, .eqMid, .eqHigh] + routes }
+        let routes: [Self] = [.routeA1, .routeA2, .routeA3, .routeA4, .routeA5, .routeB1, .routeB2]
+        if let strip = StripID(rawValue: target - 100), strip.isVirtual { return [.gain, .mute, .solo, .pan, .eqLow, .eqMid, .eqHigh] + routes }
         return [.gain, .mute, .solo, .padX, .padY, .comp, .gate] + routes
     }
 }
@@ -151,6 +167,12 @@ struct MIDIMapping: Codable, Identifiable, Equatable {
     var mode = MIDIValueMode.absolute
     var button = MIDIButtonMode.toggle
     var pickup = true
+    /// For midiPluginTarget: the insert (InsertConfig.id) and its parameter index.
+    var pluginInsertID: UUID? = nil
+    var pluginParameter: Int? = nil
+    /// For midiMacroTarget / midiSceneTarget.
+    var macroID: UUID? = nil
+    var sceneID: UUID? = nil
 
     /// Keep the parameter valid when the target changes.
     mutating func normalize() {

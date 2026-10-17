@@ -21,6 +21,13 @@ public final class StereoRingBuffer {
     }
     // Accessed only by the consumer; reset requires stopped IO.
     private var playbackPrimed = false
+    // Diagnostics: each counter has a single writer (producer or consumer side).
+    private let underrunCounter = vm_counter_create()!
+    private let overflowCounter = vm_counter_create()!
+    /// Times a primed playback read found too few frames (consumer starved).
+    public var underruns: UInt64 { vm_counter_load(underrunCounter) }
+    /// Writes that dropped frames because the ring was full (producer too fast).
+    public var overflows: UInt64 { vm_counter_load(overflowCounter) }
 
     public init(capacityFrames: Int = 16384) {
         // Ensure capacity is a power of 2 for fast bitwise masking
@@ -38,12 +45,22 @@ public final class StereoRingBuffer {
         buffer.deallocate()
         vm_counter_destroy(readCounter)
         vm_counter_destroy(writeCounter)
+        vm_counter_destroy(underrunCounter)
+        vm_counter_destroy(overflowCounter)
     }
 
     public func reset() {
         playbackPrimed = false
         readIndex = writeIndex
         buffer.initialize(repeating: 0.0, count: capacityFrames * 2)
+    }
+
+    /// Producer-side position, for marking where a new stream segment begins.
+    public var writePosition: UInt64 { writeIndex }
+    /// Consumer only: drop everything written before `position` (a producer-published index).
+    public func skip(to position: UInt64) {
+        let write = writeIndex
+        readIndex = min(max(position, readIndex), write)
     }
 
     @inline(__always)
@@ -72,6 +89,7 @@ public final class StereoRingBuffer {
     public func write(from source: UnsafePointer<Float>, frameCount: Int) -> Int {
         let avail = availableWrite()
         let toWrite = min(frameCount, avail)
+        if toWrite < frameCount { vm_counter_store(overflowCounter, vm_counter_load(overflowCounter) + 1) }
         if toWrite <= 0 { return 0 }
 
         let currentWrite = Int(writeIndex & UInt64(mask))
@@ -102,6 +120,7 @@ public final class StereoRingBuffer {
             playbackPrimed = available >= startupFrames
         }
         if !playbackPrimed || available < frameCount {
+            if playbackPrimed { vm_counter_store(underrunCounter, vm_counter_load(underrunCounter) + 1) }
             playbackPrimed = false
             memset(destination, 0, frameCount * 2 * MemoryLayout<Float>.size)
             return 0

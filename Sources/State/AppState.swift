@@ -63,6 +63,10 @@ public final class AppState: ObservableObject {
     let midiMonitor = MIDIMonitor()
     var midiPickup: [UUID: MIDIPickupState] = [:]
     var midiButtonsDown: [UUID: Bool] = [:]
+    // Macro buttons and scenes (see AppState+Macros.swift).
+    @Published var macroButtons: [MacroButton] = []
+    @Published var scenes: [MixerScene] = []
+    @Published var activeSceneID: UUID?
     func setDesktopControls(_ preferences: DesktopControlsPreferences) {
         var value = preferences; value.normalize(); desktopControls = value; saveSettings()
     }
@@ -104,17 +108,57 @@ public final class AppState: ObservableObject {
     @Published public var sidechainAlignmentEnabled = true
     @Published public var insertAlignmentDelays: [UUID: Int] = [:]
     @Published public var routeCompensation: [InsertTarget: Int] = [:]
+    // Atomic engine options: switching them keeps every device running.
     public func setLatencyCompensation(_ enabled: Bool) {
-        engine.withStoppedAudio { engine.latencyCompensationEnabled = enabled }
+        engine.latencyCompensationEnabled = enabled
         latencyCompensationEnabled = enabled; saveSettings()
     }
     public func setSidechainAlignment(_ enabled: Bool) {
-        engine.withStoppedAudio { engine.sidechainAlignmentEnabled = enabled }
+        engine.sidechainAlignmentEnabled = enabled
         sidechainAlignmentEnabled = enabled; saveSettings()
     }
     public func setOutputBusAlignment(_ enabled: Bool) {
-        engine.withStoppedAudio { engine.outputBusAlignmentEnabled = enabled }
+        engine.outputBusAlignmentEnabled = enabled
         outputBusAlignmentEnabled = enabled; saveSettings()
+    }
+    @Published var defaultBypassMode = InsertBypassMode.latency
+    @Published var automaticPluginRestart = true
+    @Published var insertHasBypassParameter: [UUID: Bool] = [:]
+    var pluginRestartCounts: [UUID: Int] = [:]
+    private var pluginFaultSince: [UUID: Date] = [:]
+    private var pluginRestartWindow: [UUID: (start: Date, count: Int)] = [:]
+    func setDefaultBypassMode(_ mode: InsertBypassMode) { defaultBypassMode = mode; saveSettings() }
+    func setAutomaticPluginRestart(_ enabled: Bool) { automaticPluginRestart = enabled; saveSettings() }
+
+    // Configurable layout (Banana-like 3+3 up to Potato-like 5+5 physical strips/buses).
+    @Published var hardwareInputCount = 3
+    @Published var physicalBusCount = 3
+    var visibleStrips: [StripID] { StripID.allCases.filter { $0.hardwareIndex.map { $0 < hardwareInputCount } ?? true } }
+    var visibleBuses: [BusID] { BusID.allCases.filter { $0.physicalIndex.map { $0 < physicalBusCount } ?? true } }
+    func isVisible(_ target: InsertTarget) -> Bool {
+        switch target { case .strip(let strip): return visibleStrips.contains(strip); case .bus(let bus): return visibleBuses.contains(bus) }
+    }
+    var visibleRecordingSources: [RecordingSource] {
+        let order = visibleBuses.map { InsertTarget.bus($0) } + visibleStrips.map { InsertTarget.strip($0) }
+        return order.compactMap { target in RecordingSource.allCases.first { $0.target == target } }
+    }
+    /// Hidden strips/buses release their devices but keep the saved assignment.
+    func setLayout(hardwareInputs: Int, physicalBuses: Int) {
+        guard !isStartingAudio else { return }
+        hardwareInputCount = min(5, max(3, hardwareInputs)); physicalBusCount = min(5, max(3, physicalBuses))
+        if !isUIPreview { applyLayoutDevices() }
+        saveSettings()
+    }
+    private func applyLayoutDevices() {
+        for strip in StripID.allCases where strip.isHardware {
+            let device = visibleStrips.contains(strip) ? inputDevices.first { $0.uid == strips[strip]?.deviceUID } : nil
+            engine.assignInputDevice(strip: strip, device: device)
+        }
+        for bus in BusID.allCases where bus.physicalIndex.map({ $0 >= 3 }) == true {
+            let device = visibleBuses.contains(bus) ? outputDevices.first { $0.uid == buses[bus]?.deviceUID } : nil
+            engine.assignOutputDevice(bus: bus, device: device)
+        }
+        reportDeviceErrors()
     }
     public func sidechainUsesPreviousBlock(target: InsertTarget, bus: BusID) -> Bool {
         SidechainRenderGraph(strips: strips, inserts: insertConfigs.filter { insertChainIsEnabled($0.key) }).usesPreviousBlock(source: bus, target: target)
@@ -159,7 +203,7 @@ public final class AppState: ObservableObject {
     private var appQueryInFlight = false
     private var appTrimRevision = 0
     private var isShuttingDown = false
-    private let engine = AudiomeeterEngine.shared
+    let engine = AudiomeeterEngine.shared
     private let deviceManager = AudioDeviceManager.shared
 
     public init() {
@@ -254,12 +298,12 @@ public final class AppState: ObservableObject {
             buses[.B2]?.deviceUID = nil
         }
 
-        for (strip, setting) in strips {
+        for (strip, setting) in strips where visibleStrips.contains(strip) {
             if let uid = setting.deviceUID, let dev = inputDevices.first(where: { $0.uid == uid }) {
                 setStripDevice(strip: strip, device: dev)
             }
         }
-        for (bus, setting) in buses {
+        for (bus, setting) in buses where visibleBuses.contains(bus) {
             if let uid = setting.deviceUID, let dev = outputDevices.first(where: { $0.uid == uid }) {
                 setBusDevice(bus: bus, device: dev)
             }
@@ -439,7 +483,7 @@ public final class AppState: ObservableObject {
             }
         }
         strips[strip] = s
-        engine.updateStripSettings(strip: strip) { $0 = s }
+        engine.updateStripSettings(strip: strip) { let device = $0.deviceUID; $0 = s; $0.deviceUID = device }
         saveSettings()
     }
 
@@ -493,14 +537,14 @@ public final class AppState: ObservableObject {
     }
 
     func setBusEQPosition(_ position: BusEQPosition) {
-        engine.withStoppedAudio { engine.busProcessingOrder = position.order }
+        engine.busProcessingOrder = position.order // Atomic: applies at the next block.
         busEQPosition = position; busProcessingOrder = position.order
         saveSettings()
     }
 
     func setBusProcessingOrder(_ order: [BusProcessingStage]) {
         guard BusProcessingStage.isValid(order) else { return }
-        engine.withStoppedAudio { engine.busProcessingOrder = order }
+        engine.busProcessingOrder = order
         busProcessingOrder = order
         saveSettings()
     }
@@ -596,6 +640,7 @@ public final class AppState: ObservableObject {
         let timer = Timer(timeInterval: 1.0 / meterRefreshRate, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
+                self.engine.reclaimRetiredChains()
                 self.meterStore.frame = MixerMeterStore.Frame(
                     strips: Dictionary(uniqueKeysWithValues: StripID.allCases.map { ($0, self.engine.getStripMeter(strip: $0)) }),
                     buses: Dictionary(uniqueKeysWithValues: BusID.allCases.map { ($0, self.engine.getBusMeter(bus: $0)) }))
@@ -657,6 +702,12 @@ public final class AppState: ObservableObject {
         var insertChainEnabled: [Int: Bool]?
         var midiMappings: [MIDIMapping]?
         var midiEnabled: Bool?
+        var defaultBypassMode: InsertBypassMode?
+        var automaticPluginRestart: Bool?
+        var hardwareInputCount: Int?
+        var physicalBusCount: Int?
+        var macroButtons: [MacroButton]?
+        var scenes: [MixerScene]?
     }
 
     private var settingsFileURL: URL {
@@ -688,6 +739,9 @@ public final class AppState: ObservableObject {
         savedConfig.outputBusAlignment = outputBusAlignmentEnabled
         savedConfig.desktopControls = desktopControls; savedConfig.insertChainEnabled = insertChainEnabled
         savedConfig.midiMappings = midiMappings; savedConfig.midiEnabled = midiEnabled
+        savedConfig.defaultBypassMode = defaultBypassMode; savedConfig.automaticPluginRestart = automaticPluginRestart
+        savedConfig.hardwareInputCount = hardwareInputCount; savedConfig.physicalBusCount = physicalBusCount
+        savedConfig.macroButtons = macroButtons; savedConfig.scenes = scenes
         if let data = try? JSONEncoder().encode(savedConfig) {
             try? data.write(to: settingsFileURL, options: .atomic)
         }
@@ -704,6 +758,12 @@ public final class AppState: ObservableObject {
         insertChainEnabled = config.insertChainEnabled ?? [:]
         midiMappings = Array((config.midiMappings ?? []).prefix(256)).map { var mapping = $0; mapping.normalize(); return mapping }
         midiEnabled = config.midiEnabled ?? true
+        defaultBypassMode = config.defaultBypassMode ?? .latency
+        automaticPluginRestart = config.automaticPluginRestart ?? true
+        hardwareInputCount = min(5, max(3, config.hardwareInputCount ?? 3))
+        physicalBusCount = min(5, max(3, config.physicalBusCount ?? 3))
+        macroButtons = Array((config.macroButtons ?? []).prefix(64))
+        scenes = Array((config.scenes ?? []).prefix(128))
         engine.disabledInsertTargets = Set(insertChainEnabled.filter { !$0.value }.compactMap { InsertTarget.from($0.key) })
         eqPresets = config.eqPresets ?? [:]
         stripEQPresets = config.stripEQPresets ?? [:]
@@ -723,13 +783,16 @@ public final class AppState: ObservableObject {
         for (k, v) in config.strips {
             if let strip = StripID(rawValue: k) {
                 strips[strip] = v
-                engine.updateStripSettings(strip: strip) { $0 = v }
+                // Hidden strips keep their saved device in the UI state only.
+                let hidden = strip.hardwareIndex.map { $0 >= hardwareInputCount } ?? false
+                engine.updateStripSettings(strip: strip) { $0 = v; if hidden { $0.deviceUID = nil } }
             }
         }
         for (k, v) in config.buses {
             if let bus = BusID(rawValue: k) {
                 buses[bus] = v
-                engine.updateBusSettings(bus: bus) { $0 = v }
+                let hidden = bus.physicalIndex.map { $0 >= physicalBusCount } ?? false
+                engine.updateBusSettings(bus: bus) { $0 = v; if hidden { $0.deviceUID = nil } }
             }
         }
     }
@@ -761,68 +824,97 @@ extension AppState {
 
     private func restoreInserts() {
         guard pluginHostingAvailable else { return }
+        var restored = engine.inserts
         for target in InsertTarget.all {
             for config in insertConfigs[target] ?? [] {
                 do {
-                    let slot = try HostedInsert(config: config, rate: engine.engineSampleRate, block: engine.bufferSize)
-                    engine.inserts[target, default: []].append(slot)
+                    restored[target, default: []].append(try HostedInsert(config: config, rate: engine.engineSampleRate, block: engine.bufferSize))
                 } catch { audioError = "\(config.name): \(error.localizedDescription)" }
             }
         }
+        engine.inserts = restored
         updateInsertLatency()
     }
 
+    func hostedInsert(_ target: InsertTarget, _ id: UUID) -> HostedInsert? { engine.inserts[target]?.first { $0.config.id == id } }
+
+    // Chain edits publish a new snapshot to the running mixer; no device is stopped.
     public func addInsert(target: InsertTarget, position: InsertPosition, path: String, identifier: String? = nil) {
         guard !isStartingAudio else { return }
         guard pluginHostingAvailable else { audioError = L10n.text("VST3ホストが見つかりません。build_app.shでアプリをビルドしてください。"); return }
-        engine.withStoppedAudio {
-            do {
-                var config = InsertConfig(path: path, name: URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent, position: position)
-                config.identifier = identifier
-                let slot = try HostedInsert(config: config, rate: engine.engineSampleRate, block: engine.bufferSize)
-                engine.inserts[target, default: []].append(slot)
-                insertConfigs[target, default: []].append(slot.snapshot())
-            } catch { audioError = error.localizedDescription }
-        }
+        do {
+            var config = InsertConfig(path: path, name: URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent, position: position)
+            config.identifier = identifier
+            let slot = try HostedInsert(config: config, rate: engine.engineSampleRate, block: engine.bufferSize)
+            var chains = engine.inserts
+            chains[target, default: []].append(slot)
+            engine.inserts = chains
+            insertConfigs[target, default: []].append(slot.snapshot())
+        } catch { audioError = error.localizedDescription }
         updateInsertLatency()
         saveSettings()
     }
 
     public func editInsert(target: InsertTarget, id: UUID) {
-        guard let slot = engine.inserts[target]?.first(where: { $0.config.id == id }) else { return }
+        guard let slot = hostedInsert(target, id) else { return }
         slot.refresh()
-        if !slot.status.isEmpty && slot.status != L10n.text("読込中…") { engine.withStoppedAudio { slot.retry() } }
+        if !slot.status.isEmpty && slot.status != L10n.text("読込中…") { restartInsert(target: target, id: id, showEditor: true); return }
         slot.showEditor()
+    }
+
+    /// Replaces a slot's worker with a fresh one (same settings and state) while audio runs.
+    func restartInsert(target: InsertTarget, id: UUID, showEditor: Bool = false) {
+        guard let old = hostedInsert(target, id) else { return }
+        old.refresh()
+        do {
+            let replacement = try HostedInsert(config: old.config, rate: engine.engineSampleRate, block: engine.bufferSize)
+            engine.replaceInsert(old, with: replacement)
+            pluginRestartCounts[id, default: 0] += 1
+            if showEditor { replacement.showEditor() }
+        } catch { insertStatus[id] = error.localizedDescription }
+        updateInsertLatency()
     }
 
     public func changeInsert(target: InsertTarget, id: UUID, remove: Bool = false, move: Int = 0, bypass: Bool? = nil) {
         guard !isStartingAudio else { return }
-        if let bypass, !remove, move == 0 {
-            // Bypass is an atomic per-slot flag; the worker resynchronizes on resume.
-            guard let index = insertConfigs[target]?.firstIndex(where: { $0.id == id }) else { return }
-            insertConfigs[target]?[index].bypassed = bypass
-            engine.inserts[target]?.first(where: { $0.config.id == id })?.setBypassed(bypass)
-            updateInsertLatency(); saveSettings(); return
+        if let bypass, !remove, move == 0 { setInsertBypass(target: target, id: id, mode: bypass ? defaultBypassMode : nil); return }
+        guard var configs = insertConfigs[target], let index = configs.firstIndex(where: { $0.id == id }) else { return }
+        var chains = engine.inserts
+        if remove {
+            configs.remove(at: index)
+            chains[target]?.removeAll { $0.config.id == id }
+            midiMappings.removeAll { $0.pluginInsertID == id }
+        } else if move != 0 {
+            let next = index + move
+            guard configs.indices.contains(next), configs[next].position == configs[index].position else { return }
+            configs.swapAt(index, next)
+            chains[target]?.sort { a, b in (configs.firstIndex { $0.id == a.config.id } ?? 0) < (configs.firstIndex { $0.id == b.config.id } ?? 0) }
         }
-        engine.withStoppedAudio {
-            guard var configs = insertConfigs[target], let index = configs.firstIndex(where: { $0.id == id }) else { return }
-            if remove {
-                configs.remove(at: index)
-                engine.inserts[target]?.removeAll { $0.config.id == id }
-            } else if let bypass {
-                configs[index].bypassed = bypass
-                engine.inserts[target]?.first(where: { $0.config.id == id })?.config.bypassed = bypass
-                engine.inserts[target]?.first(where: { $0.config.id == id })?.updateControls()
-            } else if move != 0 {
-                let next = index + move
-                if configs.indices.contains(next), configs[next].position == configs[index].position {
-                    configs.swapAt(index, next)
-                    engine.inserts[target]?.sort { a, b in configs.firstIndex(where: { $0.id == a.config.id })! < configs.firstIndex(where: { $0.id == b.config.id })! }
-                }
-            }
-            insertConfigs[target] = configs
-        }
+        engine.inserts = chains
+        insertConfigs[target] = configs
         updateInsertLatency()
+        saveSettings()
+    }
+
+    /// nil = active. `.latency` keeps the worker and its PDC (the plugin's own VST3 bypass
+    /// when it has one); `.full` removes the plugin and its latency from the path.
+    func setInsertBypass(target: InsertTarget, id: UUID, mode: InsertBypassMode?) {
+        guard let index = insertConfigs[target]?.firstIndex(where: { $0.id == id }) else { return }
+        insertConfigs[target]?[index].bypassed = mode != nil
+        if let mode { insertConfigs[target]?[index].bypassMode = mode }
+        hostedInsert(target, id)?.setBypass(mode)
+        updateInsertLatency(); saveSettings()
+    }
+    /// Click: toggle with the default bypass kind. Option-click: use the other kind.
+    func toggleInsertBypass(target: InsertTarget, id: UUID, alternate: Bool) {
+        guard let config = insertConfigs[target]?.first(where: { $0.id == id }) else { return }
+        let wanted = alternate ? defaultBypassMode.other : defaultBypassMode
+        setInsertBypass(target: target, id: id, mode: config.effectiveBypass == wanted ? nil : wanted)
+    }
+    func setInsertMIDIInput(target: InsertTarget, id: UUID, channel: Int?) {
+        guard let index = insertConfigs[target]?.firstIndex(where: { $0.id == id }) else { return }
+        insertConfigs[target]?[index].midiInput = channel
+        hostedInsert(target, id)?.setMIDIInput(channel)
         saveSettings()
     }
 
@@ -837,31 +929,46 @@ extension AppState {
         }
     }
     public func setInsertSidechain(target: InsertTarget, id: UUID, strip: StripID?, bus: BusID? = nil) {
-        engine.withStoppedAudio {
-            if let slot = engine.inserts[target]?.first(where: { $0.config.id == id }) {
-                slot.config.sidechain = strip; slot.config.sidechainBus = bus; slot.updateControls()
-                if let index = insertConfigs[target]?.firstIndex(where: { $0.id == id }) { insertConfigs[target]?[index].sidechain = strip; insertConfigs[target]?[index].sidechainBus = bus }
-            }
-        }
+        guard let slot = hostedInsert(target, id) else { return }
+        slot.config.sidechain = strip; slot.config.sidechainBus = bus
+        if let index = insertConfigs[target]?.firstIndex(where: { $0.id == id }) { insertConfigs[target]?[index].sidechain = strip; insertConfigs[target]?[index].sidechainBus = bus }
+        engine.inserts = engine.inserts // Republish: the snapshot captures sidechain routing.
         saveSettings()
     }
     public func retryInsert(target: InsertTarget, id: UUID) {
-        engine.withStoppedAudio { engine.inserts[target]?.first(where: { $0.config.id == id })?.retry() }
+        restartInsert(target: target, id: id)
         refreshPlugins()
     }
     private func refreshPlugins() {
         var changed = false
+        var restarts: [(InsertTarget, UUID, Bool)] = []
+        let now = Date()
         for target in InsertTarget.all {
             for slot in engine.inserts[target] ?? [] {
-                if slot.needsEditorRecovery { engine.withStoppedAudio { slot.recoverEditor() } }
+                let id = slot.config.id
+                if slot.needsEditorRecovery { restarts.append((target, id, true)); continue }
                 slot.refresh()
-                if insertStatus[slot.config.id] != slot.status { insertStatus[slot.config.id] = slot.status }
-                if insertSideChannels[slot.config.id] != slot.sidechainChannels { insertSideChannels[slot.config.id] = slot.sidechainChannels }
-                if let index = insertConfigs[target]?.firstIndex(where: { $0.id == slot.config.id }), insertConfigs[target]?[index] != slot.config {
+                // Automatic recovery for crashed or late workers: wait 2 s, at most 3 times per minute.
+                let code = slot.faultCode
+                if automaticPluginRestart && (code == 2 || code == 3) {
+                    let since = pluginFaultSince[id] ?? now
+                    pluginFaultSince[id] = since
+                    let window = pluginRestartWindow[id] ?? (start: now, count: 0)
+                    let recent: (start: Date, count: Int) = now.timeIntervalSince(window.start) < 60 ? window : (start: now, count: 0)
+                    if now.timeIntervalSince(since) >= 2 && recent.count < 3 {
+                        pluginRestartWindow[id] = (recent.start, recent.count + 1); pluginFaultSince[id] = nil
+                        restarts.append((target, id, false))
+                    }
+                } else if code == 0 { pluginFaultSince[id] = nil }
+                if insertStatus[id] != slot.status { insertStatus[id] = slot.status }
+                if insertSideChannels[id] != slot.sidechainChannels { insertSideChannels[id] = slot.sidechainChannels }
+                if insertHasBypassParameter[id] != slot.hasBypassParameter { insertHasBypassParameter[id] = slot.hasBypassParameter }
+                if let index = insertConfigs[target]?.firstIndex(where: { $0.id == id }), insertConfigs[target]?[index] != slot.config {
                     insertConfigs[target]?[index] = slot.config; changed = true
                 }
             }
         }
+        for (target, id, editor) in restarts { restartInsert(target: target, id: id, showEditor: editor) }
         updateInsertLatency()
         if changed { saveSettings() }
     }

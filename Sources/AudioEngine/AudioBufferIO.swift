@@ -44,8 +44,9 @@ enum StereoAudioBufferIO {
         return frames
     }
 
-    static func write(_ stereo: UnsafePointer<Float>, frames: Int, to data: UnsafeMutablePointer<AudioBufferList>, channelOffset: Int = 0, leftChannel: Int? = nil, rightChannel: Int? = nil) {
-        clear(data)
+    /// `clearFirst: false` adds another bus on different channels of a buffer already written this cycle.
+    static func write(_ stereo: UnsafePointer<Float>, frames: Int, to data: UnsafeMutablePointer<AudioBufferList>, channelOffset: Int = 0, leftChannel: Int? = nil, rightChannel: Int? = nil, clearFirst: Bool = true) {
+        if clearFirst { clear(data) }
         let buffers = UnsafeMutableAudioBufferListPointer(data)
         let left = leftChannel.map { channel($0, in: buffers) } ?? (channel(max(0, channelOffset), in: buffers) ?? channel(0, in: buffers))
         let right = rightChannel.map { channel($0, in: buffers) } ?? (channel(max(0, channelOffset) + 1, in: buffers) ?? channel(1, in: buffers))

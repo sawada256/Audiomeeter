@@ -7,12 +7,43 @@ public struct BiquadFilter {
     private var a1: Float = 0.0, a2: Float = 0.0
     private var x1_L: Float = 0.0, x2_L: Float = 0.0, y1_L: Float = 0.0, y2_L: Float = 0.0
     private var x1_R: Float = 0.0, x2_R: Float = 0.0, y1_R: Float = 0.0, y2_R: Float = 0.0
+    // Coefficients currently applied by processBlock; they ramp toward the targets above,
+    // so EQ edits glide over one block instead of stepping (zipper noise).
+    private var c0: Float = 1, c1: Float = 0, c2: Float = 0, d1: Float = 0, d2: Float = 0
+    private var primed = false
 
     public init() {}
 
     public mutating func reset() {
         x1_L = 0; x2_L = 0; y1_L = 0; y2_L = 0
         x1_R = 0; x2_R = 0; y1_R = 0; y2_R = 0
+        primed = false
+    }
+    /// Clears the signal state only (a filter resuming after being skipped).
+    public mutating func clearState() {
+        x1_L = 0; x2_L = 0; y1_L = 0; y2_L = 0
+        x1_R = 0; x2_R = 0; y1_R = 0; y2_R = 0
+    }
+    var targetIsIdentity: Bool { b0 == 1 && b1 == 0 && b2 == 0 && a1 == 0 && a2 == 0 }
+    var isSettled: Bool { primed && c0 == b0 && c1 == b1 && c2 == b2 && d1 == a1 && d2 == a2 }
+
+    /// Block processing with per-sample linear coefficient interpolation after a change.
+    public mutating func processBlock(_ buffer: UnsafeMutablePointer<Float>, frames: Int) {
+        guard frames > 0 else { return }
+        if !primed { c0 = b0; c1 = b1; c2 = b2; d1 = a1; d2 = a2; primed = true }
+        let ramp = !isSettled
+        let scale = 1 / Float(frames)
+        let s0 = (b0 - c0) * scale, s1 = (b1 - c1) * scale, s2 = (b2 - c2) * scale, t1 = (a1 - d1) * scale, t2 = (a2 - d2) * scale
+        for i in 0..<frames {
+            if ramp { c0 += s0; c1 += s1; c2 += s2; d1 += t1; d2 += t2 }
+            let left = buffer[i * 2], right = buffer[i * 2 + 1]
+            let outL = c0 * left + c1 * x1_L + c2 * x2_L - d1 * y1_L - d2 * y2_L
+            x2_L = x1_L; x1_L = left; y2_L = y1_L; y1_L = outL
+            let outR = c0 * right + c1 * x1_R + c2 * x2_R - d1 * y1_R - d2 * y2_R
+            x2_R = x1_R; x1_R = right; y2_R = y1_R; y1_R = outR
+            buffer[i * 2] = outL; buffer[i * 2 + 1] = outR
+        }
+        if ramp { c0 = b0; c1 = b1; c2 = b2; d1 = a1; d2 = a2 }
     }
 
     public mutating func setLowShelf(sampleRate: Float, cutoffHz: Float = 100.0, gainDB: Float) {
@@ -166,6 +197,7 @@ public struct BiquadFilter {
 /// 6-Band Parametric Master Bus EQ
 public final class ParametricEQ6Band {
     private var filters: [BiquadFilter] = Array(repeating: BiquadFilter(), count: 6)
+    private var skipped = [Bool](repeating: true, count: 6)
     private var lastConfig: MasterEQConfig?
     private var lastSampleRate: Float = 0.0
 
@@ -194,21 +226,13 @@ public final class ParametricEQ6Band {
 
     public func process(buffer: UnsafeMutablePointer<Float>, frames: Int) {
         guard let config = lastConfig, config.isEnabled else { return }
-
-        for frame in 0..<frames {
-            var l = buffer[frame * 2]
-            var r = buffer[frame * 2 + 1]
-
-            for i in 0..<min(6, config.bands.count) {
-                if config.bands[i].isEnabled {
-                    let (nl, nr) = filters[i].process(left: l, right: r)
-                    l = nl
-                    r = nr
-                }
-            }
-
-            buffer[frame * 2] = l
-            buffer[frame * 2 + 1] = r
+        for i in 0..<min(6, config.bands.count) {
+            // A disabled band glides to unity before it is skipped; a re-enabled band
+            // restarts from clean state at unity and glides to its new response.
+            let active = config.bands[i].isEnabled || !(filters[i].isSettled && filters[i].targetIsIdentity)
+            guard active else { skipped[i] = true; continue }
+            if skipped[i] { filters[i].clearState(); skipped[i] = false }
+            filters[i].processBlock(buffer, frames: frames)
         }
     }
 
@@ -437,15 +461,9 @@ public final class StripDSP {
             highFilter.setHighShelf(sampleRate: sampleRate, cutoffHz: 8000.0, gainDB: eq.highGainDB)
 
             }
-            for i in 0..<frames {
-                let l = buffer[i * 2]
-                let r = buffer[i * 2 + 1]
-                let (l1, r1) = lowFilter.process(left: l, right: r)
-                let (l2, r2) = midFilter.process(left: l1, right: r1)
-                let (l3, r3) = highFilter.process(left: l2, right: r2)
-                buffer[i * 2] = l3
-                buffer[i * 2 + 1] = r3
-            }
+            lowFilter.processBlock(buffer, frames: frames)
+            midFilter.processBlock(buffer, frames: frames)
+            highFilter.processBlock(buffer, frames: frames)
         }
 
         if !isVirtual { padDSP.process(buffer: buffer, frames: frames, rate: sampleRate, mode: padMode,
@@ -486,6 +504,11 @@ public final class BusDSP {
     private var peakHead = 0, peakTail = 0, lookaheadFrames = 0
     private var lookaheadTime: Int64 = 0
     private var lookaheadGain: Float = 1
+    // Moving average of the released gain over the lookahead window: the attack ramps
+    // linearly across the window and still reaches the required gain at the peak.
+    private var gainWindow = [Float](repeating: 1, count: 8192)
+    private var gainWindowSum: Double = 0
+    private var gainWindowIndex = 0
     public static func limiterLatency(sampleRate: Float, milliseconds: Double, enabled: Bool = true) -> Int {
         guard enabled, milliseconds.isFinite else { return 0 }
         return min(8190,max(0,Int(Double(sampleRate)*min(20,max(0,milliseconds))/1000)))
@@ -493,6 +516,8 @@ public final class BusDSP {
     private func resetLookahead(_ frames: Int) {
         lookaheadFrames = frames; lookaheadTime = 0; peakHead = 0; peakTail = 0; lookaheadGain = 1
         for i in lookaheadAudio.indices { lookaheadAudio[i] = 0 }
+        for i in gainWindow.indices { gainWindow[i] = 1 }
+        gainWindowSum = Double(frames + 1); gainWindowIndex = 0
     }
 
     public init() {}
@@ -584,10 +609,16 @@ public final class BusDSP {
                 let limited = maximum > threshold ? min(ceiling,threshold+knee*tanhf((maximum-threshold)/knee)) : maximum
                 let target = maximum > 0 ? limited/maximum : 1
                 lookaheadGain = target < lookaheadGain ? target : release*lookaheadGain+(1-release)*target
+                // Every released gain in the last delay+1 samples is <= the gain the delayed
+                // output sample requires, so their mean is too (ceiling still holds).
+                gainWindowSum += Double(lookaheadGain - gainWindow[gainWindowIndex])
+                gainWindow[gainWindowIndex] = lookaheadGain
+                gainWindowIndex = gainWindowIndex == delay ? 0 : gainWindowIndex + 1
+                let gain = Float(gainWindowSum / Double(delay + 1))
                 let read = Int((time-Int64(delay)+Int64(lookaheadCapacity))%Int64(lookaheadCapacity))
-                buffer[i*2] = lookaheadAudio[read*2]*lookaheadGain
-                buffer[i*2+1] = lookaheadAudio[read*2+1]*lookaheadGain
-                maximumRatio = max(maximumRatio,1/max(0.000001,lookaheadGain))
+                buffer[i*2] = lookaheadAudio[read*2]*gain
+                buffer[i*2+1] = lookaheadAudio[read*2+1]*gain
+                maximumRatio = max(maximumRatio,1/max(0.000001,gain))
                 lookaheadTime += 1
             }
         } else { for i in 0..<(frames * 2) {

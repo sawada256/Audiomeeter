@@ -44,6 +44,12 @@ uint64_t vmw_snapshot_ack(void* handle);
 void vmw_seed_latency(void*, int);
 void vmw_reset(void* handle);
 void vmw_resync(void* handle);
+void vmw_set_soft_bypass(void* handle,int enabled);
+int vmw_has_bypass_parameter(void* handle);
+uint32_t vmw_render_micros(void* handle);
+uint32_t vmw_touched(void* handle,uint32_t* serial);
+int vmw_midi_push(void* handle,uint32_t message);
+int vmw_parameter_push(void* handle,uint32_t index,float value);
 void vmw_process(void* handle,float* audio,const float* side,int frames);
 #ifdef __cplusplus
 }

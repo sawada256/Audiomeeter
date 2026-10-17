@@ -10,6 +10,7 @@ import CoreAudio
     private var registrations: [EventHotKeyRef] = []
     private var handler: EventHandlerRef?
     private var actions: [UInt32: MixerHotkeyBinding] = [:]
+    private var macroActions: [UInt32: UUID] = [:]
     private var mediaCapture: MediaKeyCapture?
     private var mediaGeneration = UUID()
     private var suspended = false
@@ -43,7 +44,7 @@ import CoreAudio
         if let handler { RemoveEventHandler(handler); self.handler = nil }
     }
     private func unregister() {
-        for ref in registrations { UnregisterEventHotKey(ref) }; registrations.removeAll(); actions.removeAll()
+        for ref in registrations { UnregisterEventHotKey(ref) }; registrations.removeAll(); actions.removeAll(); macroActions.removeAll()
         mediaGeneration = UUID()
         mediaCapture?.stop(); mediaCapture = nil
         overlayHeld?(false)
@@ -66,6 +67,11 @@ import CoreAudio
         for (index, binding) in settings.hotkeys.enumerated() {
             if let shortcut = binding.shortcut {
                 let id = UInt32(100 + index); actions[id] = binding; register(shortcut, id: id)
+            }
+        }
+        for (index, button) in state.macroButtons.enumerated() {
+            if let shortcut = button.shortcut {
+                let id = UInt32(2000 + index); macroActions[id] = button.id; register(shortcut, id: id)
             }
         }
         registrationFailures = failures
@@ -96,6 +102,7 @@ import CoreAudio
     }
     private func handle(_ id: UInt32, down: Bool) {
         if id == 1 { overlayHeld?(down); return }
+        if let macro = macroActions[id] { state.macroButton(macro, down: down); return }
         guard down, let binding = actions[id] else { return }
         state.applyHotkey(target: binding.target, action: binding.action)
         volumeHotkeyPerformed?()

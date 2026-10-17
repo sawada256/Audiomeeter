@@ -137,17 +137,27 @@ struct AudioRegressionTests {
         let player = AudioRecorderPlayer()
         precondition(player.loadAudioFile(url: fixture))
         player.playbackRouting = [.A2: true, .A3: true, .B2: true]
+        // The first cycle publishes the engine rate; the reader then streams through the SRC.
+        player.renderPlayback(frames: 128, engineRate: 48000)
+        precondition(player.waitForBufferedPlayback(frames: 1800), "Reader thread must buffer the file")
         player.play()
-        player.renderPlayback(frames: 128, engineRate: 48000)
-        var a = [Float](repeating: 0, count: 256), b = a
-        a.withUnsafeMutableBufferPointer { player.mixRenderedPlayback(bus: .A2, buffer: $0.baseAddress!, frames: 128) }
-        b.withUnsafeMutableBufferPointer { player.mixRenderedPlayback(bus: .B2, buffer: $0.baseAddress!, frames: 128) }
-        precondition(a == b, "Every bus must receive the same playback block")
-        precondition(abs(a[2] - 0.5 / 1024) < 0.00001)
-        player.renderPlayback(frames: 128, engineRate: 48000)
-        a = [Float](repeating: 0, count: 256)
-        a.withUnsafeMutableBufferPointer { player.mixRenderedPlayback(bus: .A2, buffer: $0.baseAddress!, frames: 128) }
-        precondition(abs(a[0] - 64.0 / 1024) < 0.00001, "A2-only routing must advance playback")
+        var left: [Float] = [], right: [Float] = []
+        for block in 0..<14 {
+            if block == 7 { player.playbackRouting = [.A2: true] } // A2-only routing must keep advancing.
+            player.renderPlayback(frames: 128, engineRate: 48000)
+            var a = [Float](repeating: 0, count: 256), b = a
+            a.withUnsafeMutableBufferPointer { player.mixRenderedPlayback(bus: .A2, buffer: $0.baseAddress!, frames: 128) }
+            b.withUnsafeMutableBufferPointer { player.mixRenderedPlayback(bus: .B2, buffer: $0.baseAddress!, frames: 128) }
+            if block < 7 { precondition(a == b, "Every bus must receive the same playback block") }
+            else { precondition(b.allSatisfy { $0 == 0 }, "Unrouted bus must stay silent") }
+            for i in 0..<128 { left.append(a[i * 2]); right.append(a[i * 2 + 1]) }
+        }
+        // 24 kHz ramp i/1024 at 48 kHz: slope 1/2048 per frame after the converter's group delay.
+        for i in 300..<1200 { // Away from the start and the end-of-file step (SRC ringing).
+            precondition(abs((left[i + 1] - left[i]) - 1.0 / 2048) < 0.25 / 2048, "Upsampled ramp slope at \(i): \(left[i + 1] - left[i])")
+            precondition(abs(left[i] + right[i]) < 0.0005, "Channels must stay aligned")
+        }
+        precondition(player.playbackUnderruns == 0, "Buffered playback must not underrun")
         print("  Tape playback: multi-bus alignment, A2-only advance, 24→48 kHz rate")
     }
 
