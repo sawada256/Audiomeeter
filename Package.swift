@@ -22,6 +22,7 @@ let package = Package(
             linkerSettings: [
                 .linkedFramework("CoreAudio"),
                 .linkedFramework("AudioToolbox"),
+                .linkedFramework("CoreMIDI"),
                 .linkedFramework("Accelerate"),
                 .linkedFramework("AppKit"),
                 .linkedFramework("SwiftUI")

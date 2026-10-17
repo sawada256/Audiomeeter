@@ -51,6 +51,10 @@ swiftc Sources/Localization/Localization.swift Sources/Localization/EnglishCatal
 .build/audio-tests/bus-routing --b2
 swiftc Sources/Localization/Localization.swift Sources/Localization/EnglishCatalog.swift Sources/Localization/JapaneseCatalog.swift -DVM_AUDIO_TESTS "${SWIFT_FLAGS[@]}" "${ENGINE_TEST_SOURCES[@]}" Tests/SidechainRoutingTests.swift -o .build/audio-tests/sidechain-routing
 .build/audio-tests/sidechain-routing
+swiftc Sources/Localization/Localization.swift Sources/Localization/EnglishCatalog.swift Sources/Localization/JapaneseCatalog.swift -DVM_AUDIO_TESTS "${SWIFT_FLAGS[@]}" "${ENGINE_TEST_SOURCES[@]}" Tests/RealtimeSafetyTests.swift -o .build/audio-tests/realtime-safety
+.build/audio-tests/realtime-safety
+swiftc Sources/Localization/*.swift Sources/AudioEngine/AudioTypes.swift Sources/State/MIDIMapping.swift Tests/MIDIMappingTests.swift -o .build/audio-tests/midi-mapping
+.build/audio-tests/midi-mapping
 swiftc Sources/Localization/Localization.swift Sources/Localization/EnglishCatalog.swift Sources/Localization/JapaneseCatalog.swift "${SWIFT_FLAGS[@]}" Sources/AudioEngine/DAWDuplexTransport.swift Tests/DAWDuplexHALTests.swift -o .build/audio-tests/hal-duplex
 if [ "${VM_TEST_DUPLEX_HAL:-0}" = 1 ]; then
     if pgrep -x Audiomeeter >/dev/null; then

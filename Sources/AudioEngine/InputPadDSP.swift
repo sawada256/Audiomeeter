@@ -40,7 +40,7 @@ final class InputPadDSP {
                 // This deliberately does not claim vocal-envelope analysis or transparent resynthesis.
                 let factor = powf(2,x), amount = min(1,abs(x)*4) * (0.65+0.35*(y+1)/2)
                 for i in 0..<3 {
-                    let base: Float = [500,1500,2500][i]
+                    let base: Float = 500 + 1000 * Float(i) // 500/1500/2500 Hz without a per-call array allocation
                     filters[i*2].setPeaking(sampleRate:rate,freqHz:min(rate*0.4,base),Q:2,gainDB:-9*amount)
                     filters[i*2+1].setPeaking(sampleRate:rate,freqHz:min(rate*0.4,base*factor),Q:2+max(0,y)*2,gainDB:9*amount)
                 }

@@ -43,7 +43,8 @@ public struct SingleBusStripView: View {
                 FaderSliderView(gainDB: Binding(get: { settings.gainDB }, set: { appState.setBusGain(bus: busID, gainDB: $0) }),
                                 height: MixerLayout.faderHeight, scrollStep: appState.desktopControls.gainStep,
                                 reverseTrackpadScroll: appState.desktopControls.reverseTrackpadScroll ?? true,
-                                reverseMouseScroll: appState.desktopControls.reverseMouseScroll ?? true)
+                                reverseMouseScroll: appState.desktopControls.reverseMouseScroll ?? true,
+                                onMIDILearn: { appState.beginMIDILearn(target: InsertTarget.bus(busID).id, parameter: .gain) })
                 LiveVUMeterView(meters: appState.meterStore, target: .bus(busID), height: MixerLayout.faderHeight)
             }
         }.padding(.horizontal, 4).padding(.top, 4).frame(width: 82).frame(maxHeight: .infinity)

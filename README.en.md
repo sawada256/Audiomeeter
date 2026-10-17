@@ -4,7 +4,7 @@
 
 A stereo mixer for Apple Silicon / macOS 14+. Private development build with unnotarized test installers. Independently implemented; not an official VB-Audio product.
 
-[Installation](docs/INSTALL.en.md) · [User guide](docs/USAGE.en.md) · [Comparison](docs/COMPARISON.en.md) · [EQ/pads](docs/PADS_SPECTRUM.en.md) · [Output buses](docs/OUTPUT_BUS.en.md) · [Release](docs/DISTRIBUTION.en.md) · [Licensing](docs/LICENSING.en.md) · [Known issues](docs/AUDIT.en.md) · [Development](docs/DEVELOPMENT.en.md)
+[Installation](docs/INSTALL.en.md) · [User guide](docs/USAGE.en.md) · [Comparison](docs/COMPARISON.en.md) · [EQ/pads](docs/PADS_SPECTRUM.en.md) · [Output buses](docs/OUTPUT_BUS.en.md) · [Release](docs/DISTRIBUTION.en.md) · [Licensing](docs/LICENSING.en.md) · [Known issues](docs/AUDIT.en.md) · [Design review](docs/REVIEW_2026-10.en.md) · [Development](docs/DEVELOPMENT.en.md)
 
 ## Features
 
@@ -12,6 +12,7 @@ A stereo mixer for Apple Silicon / macOS 14+. Private development build with unn
 - ARM64 VST3 PRE/POST inserts, isolated workers, sidechains and latency compensation.
 - Dedicated duplex VAIO/B1 and AUX/B2 HAL devices with per-app trims.
 - EQ presets/overlaid spectrum; selectable input pads including experimental formant.
+- MIDI controller mapping (MIDI Learn, relative encoders, pickup).
 - Recording/playback, hotkeys, floating mini mixer, device recovery and launch at login.
 - Japanese by default, selectable English. OS/third-party editors use their own languages.
 

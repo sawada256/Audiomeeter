@@ -85,7 +85,8 @@ public struct HardwareStripView: View {
                     height: MixerLayout.faderHeight,
                     scrollStep: appState.desktopControls.gainStep,
                     reverseTrackpadScroll: appState.desktopControls.reverseTrackpadScroll ?? true,
-                    reverseMouseScroll: appState.desktopControls.reverseMouseScroll ?? true
+                    reverseMouseScroll: appState.desktopControls.reverseMouseScroll ?? true,
+                    onMIDILearn: { appState.beginMIDILearn(target: InsertTarget.strip(stripID).id, parameter: .gain) }
                 )
                 LiveVUMeterView(meters: appState.meterStore, target: .strip(stripID), height: MixerLayout.faderHeight)
             }

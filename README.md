@@ -4,7 +4,7 @@
 
 Apple Silicon / macOS 14以降向けステレオミキサー。非公開開発版で、未公証のテスト用インストーラーを用意しています。VB-Audioとは独立した実装で、公式製品ではありません。
 
-[導入](docs/INSTALL.ja.md) · [使い方](docs/USAGE.ja.md) · [本家との違い](docs/COMPARISON.ja.md) · [EQ・PAD](docs/PADS_SPECTRUM.ja.md) · [出力バス](docs/OUTPUT_BUS.ja.md) · [Release](docs/DISTRIBUTION.ja.md) · [ライセンス](docs/LICENSING.ja.md) · [既知の課題](docs/AUDIT.ja.md) · [開発](docs/DEVELOPMENT.ja.md)
+[導入](docs/INSTALL.ja.md) · [使い方](docs/USAGE.ja.md) · [本家との違い](docs/COMPARISON.ja.md) · [EQ・PAD](docs/PADS_SPECTRUM.ja.md) · [出力バス](docs/OUTPUT_BUS.ja.md) · [Release](docs/DISTRIBUTION.ja.md) · [ライセンス](docs/LICENSING.ja.md) · [既知の課題](docs/AUDIT.ja.md) · [設計レビュー](docs/REVIEW_2026-10.ja.md) · [開発](docs/DEVELOPMENT.ja.md)
 
 ## 機能
 
@@ -12,6 +12,7 @@ Apple Silicon / macOS 14以降向けステレオミキサー。非公開開発�
 - ARM64 VST3のPRE/POSTインサート、別プロセス処理、サイドチェインと遅延補正。
 - 専用HALによるVAIO/B1・AUX/B2の全二重とアプリ別trim。
 - EQプリセット・重ね表示スペアナ、切替式入力PAD（試験Formantを含む）。
+- MIDIコントローラー割り当て（MIDI Learn、相対エンコーダー、ピックアップ）。
 - 録音・再生、ホットキー、常駐ミニミキサー、自動復帰・ログイン時起動。
 - 日本語（既定）／英語切替。OS・第三者エディターの言語は提供元に従います。
 

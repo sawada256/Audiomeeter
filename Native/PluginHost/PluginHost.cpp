@@ -159,7 +159,9 @@ int vm_juce_editor_visible(void* p) { auto& plugin=*static_cast<Plugin*>(p);retu
 const char* vm_juce_name(void* p) { return static_cast<Plugin*>(p)->name.c_str(); }
 const char* vm_juce_state(void* p) {
     auto& plugin = *static_cast<Plugin*>(p);
-    const ScopedLock lock(plugin.instance->getCallbackLock());
+    // Like DAW hosts, read state on the message thread without the callback lock:
+    // VST3 getState must be thread-safe, and holding the lock here stalled the
+    // render thread for the whole serialization (large states caused dropouts/faults).
     MemoryBlock state; plugin.instance->getStateInformation(state);
     plugin.state = state.toBase64Encoding().toStdString(); return plugin.state.c_str();
 }

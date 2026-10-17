@@ -8,13 +8,16 @@ public struct FaderSliderView: View {
     public let scrollStep: Double
     public let reverseTrackpadScroll: Bool
     public let reverseMouseScroll: Bool
+    /// Right-click "MIDI Learn" for this fader; nil hides the menu.
+    let onMIDILearn: (() -> Void)?
 
     private let minDB: Float = -60.0
     private let maxDB: Float = 12.0
     private let zeroDBNorm: CGFloat = 0.833 // ~0dB location (60 / 72 = 0.833)
 
-    public init(gainDB: Binding<Float>, height: CGFloat = 180, scrollStep: Double = 1, reverseTrackpadScroll: Bool = true, reverseMouseScroll: Bool = true) {
+    public init(gainDB: Binding<Float>, height: CGFloat = 180, scrollStep: Double = 1, reverseTrackpadScroll: Bool = true, reverseMouseScroll: Bool = true, onMIDILearn: (() -> Void)? = nil) {
         self._gainDB = gainDB
+        self.onMIDILearn = onMIDILearn
         self.height = height
         self.scrollStep = scrollStep
         self.reverseTrackpadScroll = reverseTrackpadScroll
@@ -90,7 +93,7 @@ public struct FaderSliderView: View {
                     .position(x: geo.size.width / 2, y: knobY)
                 }
                 .contentShape(Rectangle())
-                .overlay(VerticalFaderInteraction(gain: $gainDB, scrollStep: scrollStep, reverseTrackpad: reverseTrackpadScroll, reverseMouse: reverseMouseScroll))
+                .overlay(VerticalFaderInteraction(gain: $gainDB, scrollStep: scrollStep, reverseTrackpad: reverseTrackpadScroll, reverseMouse: reverseMouseScroll, learn: onMIDILearn))
             }
             .frame(width: 44, height: height)
 
@@ -117,9 +120,10 @@ private struct VerticalFaderInteraction: NSViewRepresentable {
     let scrollStep: Double
     let reverseTrackpad: Bool
     let reverseMouse: Bool
+    let learn: (() -> Void)?
     func makeNSView(context: Context) -> Track { Track() }
     func updateNSView(_ view: Track, context: Context) {
-        view.gain = gain; view.step = scrollStep; view.changed = { gain = $0 }
+        view.gain = gain; view.step = scrollStep; view.changed = { gain = $0 }; view.learn = learn
         view.reverseTrackpad = reverseTrackpad; view.reverseMouse = reverseMouse
         view.setAccessibilityValue(NSNumber(value: gain))
     }
@@ -127,7 +131,19 @@ private struct VerticalFaderInteraction: NSViewRepresentable {
         var gain: Float = 0, step: Double = 1
         var reverseTrackpad = true, reverseMouse = true
         var changed: ((Float) -> Void)?
+        var learn: (() -> Void)?
         private var grabOffset: CGFloat = 0
+        override func menu(for event: NSEvent) -> NSMenu? {
+            guard learn != nil else { return nil }
+            let menu = NSMenu()
+            let item = menu.addItem(withTitle: L10n.text("MIDI Learn（コントローラーを割り当て）"), action: #selector(startLearn), keyEquivalent: "")
+            item.target = self
+            let reset = menu.addItem(withTitle: L10n.text("0 dBに戻す"), action: #selector(resetGain), keyEquivalent: "")
+            reset.target = self
+            return menu
+        }
+        @objc private func startLearn() { learn?() }
+        @objc private func resetGain() { setGain(0) }
         override var isFlipped: Bool { true }
         override init(frame: NSRect) {
             super.init(frame: frame); setAccessibilityElement(true); setAccessibilityRole(.slider)

@@ -44,6 +44,16 @@ Configure always-visible/hold-to-show mode, corner and opacity. Select meters/fa
 
 Choose the recording source with SRC and format with FMT. Check the source meter before recording, then start/stop recording. The Finder button reveals recordings; the default folder is `~/Music/AudiomeeterRecordings`. Wait for finalization before starting another recording. Load a file into the player and select its destination. Very large playback files can consume substantial memory.
 
+## MIDI controllers
+
+Use Audio Settings → MIDI to assign knobs, faders, buttons and pads to mixer controls. Add an assignment, choose its target and control, press Learn and move the control. A fader's right-click menu also offers MIDI Learn.
+
+- Targets: input strips (fader, Mute/Solo, A1–B2 routing, PAN, PAD X/Y, COMP/GATE, 3-band EQ), output buses (fader, Mute, EQ, LIMIT) and the recorder (record, play/pause, stop).
+- Messages: CC, notes and pitch bend (Mackie-style 14-bit faders), from every connected MIDI input.
+- Value formats: absolute, relative (1/127, two's complement) and relative (64 center). Absolute controls with Pickup take effect only after reaching the current value.
+- Buttons: toggle on each press, or follow the value (127 = ON).
+- MIDI feedback to motor faders or LEDs is not implemented yet.
+
 ## EQ, pads and output modes
 
 See [EQ/pads/spectrum](PADS_SPECTRUM.en.md) and [output processing/limiter](OUTPUT_BUS.en.md). Language settings affect app-owned UI. OS dialogs and third-party editors follow their providers.

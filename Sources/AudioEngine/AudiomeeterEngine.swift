@@ -47,7 +47,14 @@ public final class AudiomeeterEngine {
     let spectrumCapture = SpectrumCapture()
     var busProcessingOrder = BusProcessingStage.standard // Mutate only with stopped audio.
     var inserts: [InsertTarget: [HostedInsert]] = [:] // Changed only with stopped IO.
-    var disabledInsertTargets: Set<InsertTarget> = []
+    // Whole-chain ON/OFF is an atomic node mask, so toggling it never stops device IO.
+    private let disabledInsertMask = vm_counter_create()!
+    private var cycleDisabledMask: UInt64 = 0 // Loaded once per render cycle.
+    var disabledInsertTargets: Set<InsertTarget> {
+        get { Set(allInsertTargets.filter { vm_counter_load(disabledInsertMask) & Self.maskBit($0) != 0 }) }
+        set { vm_counter_store(disabledInsertMask, newValue.reduce(0) { $0 | Self.maskBit($1) }) }
+    }
+    private static func maskBit(_ target: InsertTarget) -> UInt64 { 1 << UInt64(SidechainRenderGraph.node(target)) }
     var latencyCompensationEnabled = true
     var outputBusAlignmentEnabled = true
     var sidechainAlignmentEnabled = true
@@ -72,15 +79,22 @@ public final class AudiomeeterEngine {
     private var renderGraph = SidechainRenderGraph(routingEdges: [UInt16](repeating: 0, count: 10), sidechainEdges: [UInt16](repeating: 0, count: 10))
     private var nodeLatencies = [Int](repeating: 0, count: 10)
     private var busManualLatencies = [Int](repeating: 0, count: 5)
-    private var realtimeCompensation: [InsertTarget: Int] = [:]
-    private var publishedCompensation: [InsertTarget: Int] = [:]
+    // Indexed by graph node. Element-wise publication keeps both arrays uniquely
+    // owned, so the render callback never triggers a copy-on-write allocation.
+    private var realtimeCompensation = [Int](repeating: 0, count: 10)
+    private var publishedCompensation = [Int](repeating: 0, count: 10)
     func insertLatency(_ target: InsertTarget) -> Int {
-        disabledInsertTargets.contains(target) ? 0 : (inserts[target] ?? []).reduce(0) { $0 + ($1.bypassed ? 0 : $1.latency) }
+        vm_counter_load(disabledInsertMask) & Self.maskBit(target) != 0 ? 0 : (inserts[target] ?? []).reduce(0) { $0 + ($1.bypassed ? 0 : $1.latency) }
     }
     private func processInserts(target: InsertTarget, position: InsertPosition, buffer: UnsafeMutablePointer<Float>, upstream: Int, frames: Int) -> Int {
-        guard !disabledInsertTargets.contains(target) else { return upstream }
+        guard cycleDisabledMask & Self.maskBit(target) == 0 else {
+            for slot in inserts[target] ?? [] where slot.position == position { slot.markIdle() }
+            return upstream
+        }
         var latency = upstream
-        for slot in inserts[target] ?? [] where slot.position == position && !slot.bypassed {
+        for slot in inserts[target] ?? [] where slot.position == position {
+            // A resumed worker must not replay the block it rendered before the pause.
+            if slot.bypassed { slot.markIdle(); continue }
             var source: UnsafeMutablePointer<Float>?
             var sourceLatency = 0
             var feedback = false
@@ -108,7 +122,7 @@ public final class AudiomeeterEngine {
                 graphRouting[strip.rawValue] |= 1 << (5 + bus.rawValue)
             }
         }
-        for (target, slots) in inserts where !disabledInsertTargets.contains(target) {
+        for (target, slots) in inserts where cycleDisabledMask & Self.maskBit(target) == 0 {
             for slot in slots where !slot.bypassed {
                 if let bus = slot.sidechainBus { graphSidechains[5 + bus.rawValue] |= 1 << SidechainRenderGraph.node(target) }
             }
@@ -120,7 +134,7 @@ public final class AudiomeeterEngine {
 
     public func compensationSamples(target: InsertTarget) -> Int {
         os_unfair_lock_lock(stateLock); defer { os_unfair_lock_unlock(stateLock) }
-        return publishedCompensation[target] ?? 0
+        return publishedCompensation[SidechainRenderGraph.node(target)]
     }
 
     public func withStoppedAudio(_ work: () -> Void) {
@@ -163,7 +177,13 @@ public final class AudiomeeterEngine {
     private func resetClockProcessing() {
         for (_, dsp) in stripDSPs { dsp.reset() }
         for (_, dsp) in busDSPs { dsp.reset() }
-        for (_, slots) in inserts { for slot in slots { slot.prepare(rate: engineSampleRate, block: bufferSize) } }
+        let slots = inserts.values.flatMap { $0 }
+        // Relaunching a worker restores its last saved state; capture recent editor edits first.
+        let relaunching = slots.filter { $0.needsRelaunch(rate: engineSampleRate, block: bufferSize) }
+        for slot in relaunching { slot.requestSnapshot() }
+        let deadline = Date().addingTimeInterval(0.5)
+        while !relaunching.allSatisfy({ $0.snapshotReady }) && Date() < deadline { usleep(10_000) }
+        for slot in slots { slot.prepare(rate: engineSampleRate, block: bufferSize) }
     }
 
     // Fallback timer when Master A1 is unassigned
@@ -185,6 +205,12 @@ public final class AudiomeeterEngine {
     // stateLock. These dictionaries are only touched by the master callback.
     private var realtimeStripSettings: [StripID: StripSettings] = [:]
     private var realtimeBusSettings: [BusID: BusSettings] = [:]
+    // The previous realtime snapshot is parked here and released by a non-realtime
+    // thread under stateLock, so dictionary/String/EQ-array storage is never freed
+    // on the render callback. The callback adopts a new snapshot only once drained.
+    private var retiredStripSettings: [StripID: StripSettings]?
+    private var retiredBusSettings: [BusID: BusSettings]?
+    private func drainRetiredSettingsLocked() { retiredStripSettings = nil; retiredBusSettings = nil }
 
     public init() {
         stateLock.initialize(to: os_unfair_lock())
@@ -206,7 +232,6 @@ public final class AudiomeeterEngine {
             let tap = UnsafeMutablePointer<Float>.allocate(capacity: maxFrameCapacity * 2)
             tap.initialize(repeating: 0, count: maxFrameCapacity * 2)
             stripTaps[strip] = tap; stripHistories[strip] = StereoSampleHistory()
-            realtimeCompensation[.strip(strip)] = 0
         }
 
         for bus in allBuses {
@@ -230,7 +255,6 @@ public final class AudiomeeterEngine {
             feedbackBusTaps[bus] = feedbackTap
             busDelays[bus] = StereoDelayLine()
             busOutputDelays[bus] = StereoDelayLine(); playbackDelays[bus] = StereoDelayLine()
-            realtimeCompensation[.bus(bus)] = 0
         }
         routeScratch.initialize(repeating: 0, count: 8192)
     }
@@ -243,7 +267,7 @@ public final class AudiomeeterEngine {
         for ptr in busTaps.values { ptr.deallocate() }
         for ptr in feedbackBusTaps.values { ptr.deallocate() }
         routeScratch.deallocate()
-        vm_counter_destroy(heartbeat)
+        vm_counter_destroy(heartbeat); vm_counter_destroy(disabledInsertMask)
         stateLock.deallocate()
     }
 
@@ -333,6 +357,7 @@ public final class AudiomeeterEngine {
         defer { if resume { start() } }
         os_unfair_lock_lock(stateLock)
         stripSettings[strip]?.deviceUID = device?.uid
+        drainRetiredSettingsLocked()
         os_unfair_lock_unlock(stateLock)
 
         // Stop existing worker
@@ -361,6 +386,7 @@ public final class AudiomeeterEngine {
         defer { if resume { start() } }
         os_unfair_lock_lock(stateLock)
         busSettings[bus]?.deviceUID = device?.uid
+        drainRetiredSettingsLocked()
         os_unfair_lock_unlock(stateLock)
 
         if bus == .A1 {
@@ -451,6 +477,7 @@ public final class AudiomeeterEngine {
             update(&s)
             stripSettings[strip] = s
         }
+        drainRetiredSettingsLocked()
         os_unfair_lock_unlock(stateLock)
     }
 
@@ -460,12 +487,14 @@ public final class AudiomeeterEngine {
             update(&b)
             busSettings[bus] = b
         }
+        drainRetiredSettingsLocked()
         os_unfair_lock_unlock(stateLock)
     }
 
     public func getStripMeter(strip: StripID) -> MeterLevel {
         os_unfair_lock_lock(stateLock)
         defer { os_unfair_lock_unlock(stateLock) }
+        drainRetiredSettingsLocked() // Meter polling also bounds how long a retired snapshot lives.
         return stripMeters[strip] ?? MeterLevel()
     }
 
@@ -543,17 +572,19 @@ public final class AudiomeeterEngine {
         renderSequence &+= 1; vm_counter_store(heartbeat, renderSequence)
         // Previous completed bus block is immutable during this render cycle.
         if clampedFrames > busTapFrames {
-            for taps in [busTaps, feedbackBusTaps] {
-                for tap in taps.values { tap.advanced(by: busTapFrames * 2).update(repeating: 0, count: (clampedFrames - busTapFrames) * 2) }
-            }
+            for tap in busTaps.values { tap.advanced(by: busTapFrames * 2).update(repeating: 0, count: (clampedFrames - busTapFrames) * 2) }
+            for tap in feedbackBusTaps.values { tap.advanced(by: busTapFrames * 2).update(repeating: 0, count: (clampedFrames - busTapFrames) * 2) }
         }
         // Never block the real-time callback behind UI work. If a control update
         // is in progress, use the previous complete snapshot for one cycle.
         if os_unfair_lock_trylock(stateLock) {
-            realtimeStripSettings = stripSettings
-            realtimeBusSettings = busSettings
+            if retiredStripSettings == nil && retiredBusSettings == nil {
+                retiredStripSettings = realtimeStripSettings; realtimeStripSettings = stripSettings
+                retiredBusSettings = realtimeBusSettings; realtimeBusSettings = busSettings
+            }
             os_unfair_lock_unlock(stateLock)
         }
+        cycleDisabledMask = vm_counter_load(disabledInsertMask)
         let localStripSettings = realtimeStripSettings
         let localBusSettings = realtimeBusSettings
 
@@ -561,8 +592,7 @@ public final class AudiomeeterEngine {
         let anySolo = localStripSettings.values.contains { $0.isSolo }
 
         updateRenderGraph()
-        for i in 0..<10 { nodeLatencies[i] = 0 }
-        for target in allInsertTargets { realtimeCompensation[target] = 0 }
+        for i in 0..<10 { nodeLatencies[i] = 0; realtimeCompensation[i] = 0 }
         // Snapshot every raw input before processing, so sidechains never depend on strip order.
         for strip in allStrips {
             if let buffer = stripMixBuffers[strip], let tap = stripTaps[strip] {
@@ -618,7 +648,8 @@ public final class AudiomeeterEngine {
                     buffer: mixBuf,
                     frames: clampedFrames,
                     previousPeakL: prevMeter.leftPeakDB,
-                    previousPeakR: prevMeter.rightPeakDB
+                    previousPeakR: prevMeter.rightPeakDB,
+                    sampleRate: Float(engineSampleRate)
                 )
                 realtimeStripMeters[strip] = newMeter
             } else {
@@ -636,7 +667,7 @@ public final class AudiomeeterEngine {
                 for strip in allStrips where localStripSettings[strip]?.routing[bus] == true {
                     let delay = alignRoutes ? incomingLatency - nodeLatencies[strip.rawValue] : 0
                     stripHistories[strip]?.read(into: routeScratch, frames: clampedFrames, delay: delay)
-                    realtimeCompensation[.strip(strip)] = max(realtimeCompensation[.strip(strip)] ?? 0, delay)
+                    realtimeCompensation[strip.rawValue] = max(realtimeCompensation[strip.rawValue], delay)
                     vDSP_vadd(bBuf, 1, routeScratch, 1, bBuf, 1, vDSP_Length(clampedFrames * 2))
                 }
                 // Tape playback is another zero-latency input to the bus summing point.
@@ -686,7 +717,7 @@ public final class AudiomeeterEngine {
             guard let bBuf = busMixBuffers[bus] else { continue }
             let setting = localBusSettings[bus] ?? BusSettings()
             let delay = outputBusAlignmentEnabled ? maximumOutputLatency - (nodeLatencies[5 + bus.rawValue] - busManualLatencies[bus.rawValue]) : 0
-            realtimeCompensation[.bus(bus)] = delay
+            realtimeCompensation[5 + bus.rawValue] = delay
             busOutputDelays[bus]?.process(bBuf, frames: clampedFrames, delay: delay)
             // Compute Bus Meter
             let prevMeter = realtimeBusMeters[bus] ?? MeterLevel()
@@ -694,7 +725,8 @@ public final class AudiomeeterEngine {
                 buffer: bBuf,
                 frames: clampedFrames,
                 previousPeakL: prevMeter.leftPeakDB,
-                previousPeakR: prevMeter.rightPeakDB
+                previousPeakR: prevMeter.rightPeakDB,
+                sampleRate: Float(engineSampleRate)
             )
             newMeter.limiterReductionDB = setting.isMuted ? 0 : (busDSPs[bus]?.limiterReductionDB ?? 0)
             realtimeBusMeters[bus] = newMeter
@@ -740,7 +772,7 @@ public final class AudiomeeterEngine {
         // Meter publication is best-effort; dropping one visual frame is always
         // preferable to missing an audio deadline.
         if os_unfair_lock_trylock(stateLock) {
-            publishedCompensation = realtimeCompensation
+            for i in 0..<10 { publishedCompensation[i] = realtimeCompensation[i] }
             for strip in allStrips { stripMeters[strip] = realtimeStripMeters[strip] }
             for bus in allBuses { busMeters[bus] = realtimeBusMeters[bus] }
             os_unfair_lock_unlock(stateLock)

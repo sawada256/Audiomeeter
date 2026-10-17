@@ -55,15 +55,22 @@ public final class AppState: ObservableObject {
     @Published var desktopControlsStatus = ""
     @Published var systemOutputStrip: StripID?
     @Published var insertChainEnabled: [Int: Bool] = [:]
+    // MIDI controller mappings (see AppState+MIDI.swift).
+    @Published var midiMappings: [MIDIMapping] = []
+    @Published var midiEnabled = true
+    @Published var midiLearnMappingID: UUID?
+    let midiInput = MIDIInputManager()
+    let midiMonitor = MIDIMonitor()
+    var midiPickup: [UUID: MIDIPickupState] = [:]
+    var midiButtonsDown: [UUID: Bool] = [:]
     func setDesktopControls(_ preferences: DesktopControlsPreferences) {
         var value = preferences; value.normalize(); desktopControls = value; saveSettings()
     }
     func insertChainIsEnabled(_ target: InsertTarget) -> Bool { insertChainEnabled[target.id] ?? true }
     func toggleInsertChain(_ target: InsertTarget) {
         let enabled = !insertChainIsEnabled(target)
-        engine.withStoppedAudio {
-            if enabled { engine.disabledInsertTargets.remove(target) } else { engine.disabledInsertTargets.insert(target) }
-        }
+        // Atomic chain mask: switching the chain keeps every device running.
+        if enabled { engine.disabledInsertTargets.remove(target) } else { engine.disabledInsertTargets.insert(target) }
         insertChainEnabled[target.id] = enabled; updateInsertLatency(); saveSettings()
     }
     func applyHotkey(target id: Int, action: MixerHotkeyAction) {
@@ -194,6 +201,7 @@ public final class AppState: ObservableObject {
             catch { audioError = error.localizedDescription }
         }
         if !isUIPreview { restoreInserts() }
+        if !isUIPreview { startMIDI() }
 
         // HAL startup can wait for a driver. Keep the window responsive while
         // starting and prohibit graph changes until the start operation completes.
@@ -647,6 +655,8 @@ public final class AppState: ObservableObject {
         var busEQPosition: BusEQPosition?
         var busProcessingOrder: [BusProcessingStage]?
         var insertChainEnabled: [Int: Bool]?
+        var midiMappings: [MIDIMapping]?
+        var midiEnabled: Bool?
     }
 
     private var settingsFileURL: URL {
@@ -656,7 +666,7 @@ public final class AppState: ObservableObject {
         return dir.appendingPathComponent("settings.json")
     }
 
-    private func saveSettings() {
+    func saveSettings() {
         guard !isUIPreview else { return }
         saveWork?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.writeSettings() }
@@ -677,6 +687,7 @@ public final class AppState: ObservableObject {
         savedConfig.busProcessingOrder = busProcessingOrder
         savedConfig.outputBusAlignment = outputBusAlignmentEnabled
         savedConfig.desktopControls = desktopControls; savedConfig.insertChainEnabled = insertChainEnabled
+        savedConfig.midiMappings = midiMappings; savedConfig.midiEnabled = midiEnabled
         if let data = try? JSONEncoder().encode(savedConfig) {
             try? data.write(to: settingsFileURL, options: .atomic)
         }
@@ -691,6 +702,8 @@ public final class AppState: ObservableObject {
         automaticDeviceRestart = config.automaticDeviceRestart ?? true
         desktopControls = config.desktopControls ?? DesktopControlsPreferences(); desktopControls.normalize()
         insertChainEnabled = config.insertChainEnabled ?? [:]
+        midiMappings = Array((config.midiMappings ?? []).prefix(256)).map { var mapping = $0; mapping.normalize(); return mapping }
+        midiEnabled = config.midiEnabled ?? true
         engine.disabledInsertTargets = Set(insertChainEnabled.filter { !$0.value }.compactMap { InsertTarget.from($0.key) })
         eqPresets = config.eqPresets ?? [:]
         stripEQPresets = config.stripEQPresets ?? [:]
@@ -784,6 +797,13 @@ extension AppState {
 
     public func changeInsert(target: InsertTarget, id: UUID, remove: Bool = false, move: Int = 0, bypass: Bool? = nil) {
         guard !isStartingAudio else { return }
+        if let bypass, !remove, move == 0 {
+            // Bypass is an atomic per-slot flag; the worker resynchronizes on resume.
+            guard let index = insertConfigs[target]?.firstIndex(where: { $0.id == id }) else { return }
+            insertConfigs[target]?[index].bypassed = bypass
+            engine.inserts[target]?.first(where: { $0.config.id == id })?.setBypassed(bypass)
+            updateInsertLatency(); saveSettings(); return
+        }
         engine.withStoppedAudio {
             guard var configs = insertConfigs[target], let index = configs.firstIndex(where: { $0.id == id }) else { return }
             if remove {
@@ -877,6 +897,7 @@ extension AppState {
         writeSettings()
         meterTimer?.invalidate()
         appPollTimer?.invalidate()
+        midiInput.stop()
     }
 
     private func startAppPolling() {

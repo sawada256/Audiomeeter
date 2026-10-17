@@ -33,6 +33,16 @@ enum AudioConfigurationError: LocalizedError { case message(String); var errorDe
         }
         precondition(gainImpulse == 549 && sideImpulse == gainImpulse,"PDC impulses \(gainImpulse), \(sideImpulse)")
         fflush(stdout); print("Required sidechain, assigned audio, 37-sample latency + 512 IPC, and PDC impulse alignment passed")
+        // Bypass while running: the mixer stops calling process (markIdle). On resume the
+        // worker's last completed block (rendered before the pause) must not be replayed.
+        for _ in 0..<4 { a.update(repeating: 1, count: 1024); gain.process(a, sidechain: nil, upstreamLatency: 0, frames: 512); usleep(11000) }
+        precondition(abs(a[0] - 0.5) < 0.0001)
+        gain.markIdle(); usleep(30000)
+        a.update(repeating: 0, count: 1024); gain.process(a, sidechain: nil, upstreamLatency: 0, frames: 512)
+        precondition(UnsafeBufferPointer(start: a, count: 1024).allSatisfy { $0 == 0 }, "Resumed insert replayed a stale pre-bypass block")
+        for _ in 0..<4 { usleep(11000); a.update(repeating: 1, count: 1024); gain.process(a, sidechain: nil, upstreamLatency: 0, frames: 512) }
+        precondition(abs(a[0] - 0.5) < 0.0001 && gain.status.isEmpty, "Worker must resume processing after resync")
+        fflush(stdout); print("Bypass resume drops the stale wet block and resynchronizes the worker")
         side.reset()
         for i in 0..<6 {
             b.update(repeating: i == 0 ? 1 : 0,count:1024)

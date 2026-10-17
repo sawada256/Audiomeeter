@@ -31,10 +31,16 @@ public struct InsertConfig: Codable, Identifiable, Equatable {
 final class HostedInsert {
     var config: InsertConfig
     private(set) var position: InsertPosition
-    private(set) var bypassed: Bool
+    // Bypass is atomic so it can change while audio runs; routing fields need stopped IO.
+    private let bypassCounter = vm_counter_create()!
+    var bypassed: Bool { vm_counter_load(bypassCounter) != 0 }
     private(set) var sidechain: StripID?
     private(set) var sidechainBus: BusID?
-    func updateControls() { position = config.position; bypassed = config.bypassed; sidechain = config.sidechain; sidechainBus = config.sidechainBus }
+    func updateControls() { position = config.position; setBypassed(config.bypassed); sidechain = config.sidechain; sidechainBus = config.sidechainBus }
+    func setBypassed(_ value: Bool) { config.bypassed = value; vm_counter_store(bypassCounter, value ? 1 : 0) }
+    // Render-callback only: set while the slot is skipped, consumed by the next process call.
+    private var idle = false
+    func markIdle() { idle = true }
     private var handle: UnsafeMutableRawPointer!
     private var worker: Process?
     private var directory: URL!
@@ -62,11 +68,12 @@ final class HostedInsert {
     }
 
     init(config: InsertConfig, rate: Double, block: UInt32) throws {
-        self.config = config; position = config.position; bypassed = config.bypassed; sidechain = config.sidechain; sidechainBus = config.sidechainBus
+        self.config = config; position = config.position; sidechain = config.sidechain; sidechainBus = config.sidechainBus
+        vm_counter_store(bypassCounter, config.bypassed ? 1 : 0)
         sideBuffer.initialize(repeating: 0, count: 8192)
-        do { try launch(rate: rate, block: block) } catch { dispose(); sideBuffer.deallocate(); vm_counter_destroy(alignmentCounter); throw error }
+        do { try launch(rate: rate, block: block) } catch { dispose(); sideBuffer.deallocate(); vm_counter_destroy(alignmentCounter); vm_counter_destroy(bypassCounter); throw error }
     }
-    deinit { dispose(); sideBuffer.deallocate(); vm_counter_destroy(alignmentCounter) }
+    deinit { dispose(); sideBuffer.deallocate(); vm_counter_destroy(alignmentCounter); vm_counter_destroy(bypassCounter) }
     private func launch(rate: Double, block: UInt32) throws {
         self.rate = rate; self.block = block; faultMessage = nil; started = Date()
         let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
@@ -124,16 +131,21 @@ final class HostedInsert {
         if vmw_fault(handle) != 0, let worker, worker.isRunning { kill(worker.processIdentifier, SIGKILL) }
         config.savedLatency = max(0, latency - Int(block))
     }
+    func needsRelaunch(rate: Double, block: UInt32) -> Bool { self.rate != rate || self.block != block }
     func prepare(rate: Double, block: UInt32) {
-        if self.rate == rate && self.block == block { reset(); return }
+        if !needsRelaunch(rate: rate, block: block) { reset(); return }
         refresh(); dispose()
         do { try launch(rate: rate, block: block) } catch { faultMessage = error.localizedDescription }
         reset()
     }
     func retry() { refresh(); dispose(); do { try launch(rate: rate, block: block) } catch { faultMessage = error.localizedDescription }; reset() }
-    func reset() { if let handle { vmw_reset(handle) }; sideDelay.reset(); mainDelay.reset(); vm_counter_store(alignmentCounter, 0) }
+    func reset() { if let handle { vmw_reset(handle) }; sideDelay.reset(); mainDelay.reset(); vm_counter_store(alignmentCounter, 0); idle = false }
     func process(_ buffer: UnsafeMutablePointer<Float>, sidechain: UnsafeMutablePointer<Float>?, upstreamLatency: Int, frames: Int, mainDelaySamples: Int = 0, sideDelaySamples: Int? = nil) {
         guard let handle else { return }
+        if idle {
+            // Resuming after bypass: drop the stale wet block and pre-pause dry history.
+            idle = false; vmw_resync(handle); sideDelay.reset(); mainDelay.reset()
+        }
         if let sidechain {
             sideBuffer.update(from: sidechain, count: frames*2)
         } else { sideBuffer.update(repeating: 0, count: frames*2) }

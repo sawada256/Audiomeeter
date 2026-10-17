@@ -7,6 +7,9 @@
 #include <atomic>
 #include <sys/event.h>
 #include <pthread.h>
+#include <mach/mach.h>
+#include <mach/mach_time.h>
+#include <mach/thread_policy.h>
 #include <thread>
 using namespace juce;
 extern "C" {
@@ -33,7 +36,21 @@ class PluginWorker final : public JUCEApplication, private Timer {
     std::atomic<bool> quitting{false};
     uint64_t editorSeen=0, snapshotSeen=0;
     int snapshots=0;
+    double rate=48000;
     bool editorWasVisible=false;
+    // Plugin DSP runs against the mixer's block deadline, so schedule it like an
+    // audio IO thread. The kernel demotes it if it exceeds the declared budget.
+    static void makeRealtime(double sampleRate,uint32_t quantum) {
+        mach_timebase_info_data_t base; if(mach_timebase_info(&base)!=KERN_SUCCESS||base.numer==0)return;
+        const double ticksPerNs=(double)base.denom/base.numer;
+        const double periodNs=quantum/jmax(8000.0,sampleRate)*1.0e9;
+        thread_time_constraint_policy_data_t policy;
+        policy.period=(uint32_t)(periodNs*ticksPerNs);
+        policy.computation=(uint32_t)(jlimit(50000.0,20000000.0,periodNs*0.5)*ticksPerNs);
+        policy.constraint=(uint32_t)(jmax(periodNs*0.9,jlimit(50000.0,20000000.0,periodNs*0.5))*ticksPerNs);
+        policy.preemptible=1;
+        thread_policy_set(pthread_mach_thread_np(pthread_self()),THREAD_TIME_CONSTRAINT_POLICY,(thread_policy_t)&policy,THREAD_TIME_CONSTRAINT_POLICY_COUNT);
+    }
 public:
     const String getApplicationName() override { return "Audiomeeter Plugin"; }
     const String getApplicationVersion() override { return "1.0.0"; }
@@ -60,7 +77,8 @@ public:
         wake=sem_open(config["semaphore"].toString().toRawUTF8(),0);
         if(wake==SEM_FAILED) { quit();return; }
         char error[1024]={0};
-        plugin=vm_juce_create_named(config["path"].toString().toRawUTF8(),config["identifier"].toString().toRawUTF8(),(double)config["rate"],shared->quantum,error,sizeof(error));
+        rate=(double)config["rate"];
+        plugin=vm_juce_create_named(config["path"].toString().toRawUTF8(),config["identifier"].toString().toRawUTF8(),rate,shared->quantum,error,sizeof(error));
         if(!plugin) {
             auto* result=new DynamicObject();result->setProperty("error",String::fromUTF8(error));
             metadata.replaceWithText(JSON::toString(var(result)));
@@ -78,6 +96,7 @@ public:
     }
     void render() {
         pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
+        makeRealtime(rate,shared->quantum);
         while(!quitting.load()) {
             if(sem_wait(wake)!=0)continue;
             if(quitting.load())break;

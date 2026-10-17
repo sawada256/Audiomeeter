@@ -79,6 +79,18 @@ public struct MainView: View {
 
             Spacer()
 
+            if appState.midiLearnMappingID != nil {
+                HStack(spacing: 6) {
+                    Image(systemName: "pianokeys")
+                    Text(L10n.text("MIDI LEARN: 割り当てる操作子を動かしてください"))
+                    Button(L10n.text("中止")) { appState.cancelMIDILearn() }.buttonStyle(.plain).underline()
+                }
+                .font(VMTheme.fontDigit)
+                .foregroundColor(.black)
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(Color.orange).cornerRadius(3)
+            }
+
             // Real-time Engine Status Badges
             HStack(spacing: 8) {
                 // Engine Running LED

@@ -450,8 +450,10 @@ public final class StripDSP {
 
         if !isVirtual { padDSP.process(buffer: buffer, frames: frames, rate: sampleRate, mode: padMode,
                                       state: padMode == .intellipan ? intellipan : padState, smooth: pitchSmooth) }
-        // Only the color PAD uses its horizontal coordinate as balance.
-        let pan = max(-1.0, min(1.0, (isVirtual || padMode == .intellipan) ? intellipan.x : 0))
+        // Only the hardware color PAD uses its horizontal coordinate as balance.
+        // Virtual strips pan with StripSettings.pan in the mixer; a legacy
+        // intellipan.x there would otherwise be a hidden second balance stage.
+        let pan = max(-1.0, min(1.0, (!isVirtual && padMode == .intellipan) ? intellipan.x : 0))
         let panL = cosf(max(0, pan) * Float.pi / 2.0)
         let panR = cosf(max(0, -pan) * Float.pi / 2.0)
 
@@ -615,7 +617,8 @@ public struct MeterCalculator {
         buffer: UnsafePointer<Float>,
         frames: Int,
         previousPeakL: Float,
-        previousPeakR: Float
+        previousPeakR: Float,
+        sampleRate: Float = 48000
     ) -> MeterLevel {
         if frames <= 0 {
             return MeterLevel()
@@ -625,19 +628,11 @@ public struct MeterCalculator {
         var maxR: Float = 0.0
         var sumSqL: Float = 0.0
         var sumSqR: Float = 0.0
-
-        for i in 0..<frames {
-            let l = buffer[i * 2]
-            let r = buffer[i * 2 + 1]
-            let absL = abs(l)
-            let absR = abs(r)
-
-            if absL > maxL { maxL = absL }
-            if absR > maxR { maxR = absR }
-
-            sumSqL += l * l
-            sumSqR += r * r
-        }
+        let count = vDSP_Length(frames)
+        vDSP_maxmgv(buffer, 2, &maxL, count)
+        vDSP_maxmgv(buffer + 1, 2, &maxR, count)
+        vDSP_svesq(buffer, 2, &sumSqL, count)
+        vDSP_svesq(buffer + 1, 2, &sumSqR, count)
 
         let rmsL = sqrtf(sumSqL / Float(frames))
         let rmsR = sqrtf(sumSqR / Float(frames))
@@ -647,9 +642,11 @@ public struct MeterCalculator {
         let rmsLDB = rmsL > 1e-5 ? 20.0 * log10f(rmsL) : -100.0
         let rmsRDB = rmsR > 1e-5 ? 20.0 * log10f(rmsR) : -100.0
 
-        // Peak decay (~0.95 per block)
-        let decayedPeakL = max(peakLDB, previousPeakL - 1.2)
-        let decayedPeakR = max(peakRDB, previousPeakR - 1.2)
+        // Peak fall is time-based (1.2 dB per 256 frames at 48 kHz), so the
+        // meter ballistics no longer change with the device buffer size.
+        let decay = 1.2 * Float(frames) / 256 * 48000 / max(8000, sampleRate.isFinite ? sampleRate : 48000)
+        let decayedPeakL = max(peakLDB, previousPeakL - decay)
+        let decayedPeakR = max(peakRDB, previousPeakR - decay)
 
         return MeterLevel(
             leftPeakDB: decayedPeakL,

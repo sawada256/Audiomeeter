@@ -90,6 +90,7 @@ struct AudioSettingsView: View {
                     }
                 }.padding(12).tabItem { Text(L10n.text("遅延補正")) }
                 DesktopControlsSettingsView(state: appState).tabItem { Text(L10n.text("キー・常駐表示")) }
+                MIDISettingsView(state: appState, monitor: appState.midiMonitor).tabItem { Text("MIDI") }
             }.frame(height: 395)
             Text(String(format: L10n.text("1ブロック: %.2f ms • 現在: %.0f Hz / %d samples"), Double(buffer) / rate * 1000, appState.engineSampleRate, appState.engineBufferSize))
                 .font(.system(.caption, design: .monospaced))

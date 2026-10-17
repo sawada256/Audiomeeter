@@ -43,6 +43,7 @@ uint64_t vmw_snapshot(void* handle);
 uint64_t vmw_snapshot_ack(void* handle);
 void vmw_seed_latency(void*, int);
 void vmw_reset(void* handle);
+void vmw_resync(void* handle);
 void vmw_process(void* handle,float* audio,const float* side,int frames);
 #ifdef __cplusplus
 }

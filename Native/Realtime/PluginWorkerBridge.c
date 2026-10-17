@@ -50,15 +50,28 @@ uint64_t vmw_editor(void* handle) { VMWorkerProxy* p=handle;return p ? __atomic_
 uint64_t vmw_editor_ack(void* handle) { VMWorkerProxy* p=handle;return p ? __atomic_load_n(&p->shared->editorAck,__ATOMIC_ACQUIRE) : 0; }
 uint64_t vmw_snapshot(void* handle) { VMWorkerProxy* p=handle;return p ? __atomic_add_fetch(&p->shared->snapshotCommand,1,__ATOMIC_RELEASE) : 0; }
 uint64_t vmw_snapshot_ack(void* handle) { VMWorkerProxy* p=handle;return p ? __atomic_load_n(&p->shared->snapshotAck,__ATOMIC_ACQUIRE) : 0; }
-void vmw_reset(void* handle) {
-    VMWorkerProxy* p=handle;if(!p)return;
+static void vmw_restart(VMWorkerProxy* p,uint64_t clearFrames) {
+    const uint64_t dryCapacity=VMW_MAX_LATENCY+VMW_FRAMES+1;
+    if(clearFrames>dryCapacity)clearFrames=dryCapacity;
     p->sequence=((p->sequence+VMW_PACKETS-1)/VMW_PACKETS)*VMW_PACKETS+VMW_PACKETS;
     p->offset=0;p->wet=0;p->dryPosition=0;p->misses=0;
-    memset(p->dry,0,(VMW_MAX_LATENCY+VMW_FRAMES+1)*2*sizeof(float));
+    // After restart the first `delay` reads come from the end of the dry ring.
+    memset(p->dry+(dryCapacity-clearFrames)*2,0,clearFrames*2*sizeof(float));
     for(int i=0;i<VMW_PACKETS;++i) {
         uint32_t state=__atomic_load_n(&p->shared->packets[i].state,__ATOMIC_ACQUIRE);
         if(state==1||state==3)__atomic_compare_exchange_n(&p->shared->packets[i].state,&state,0,0,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE);
     }
+}
+void vmw_reset(void* handle) {
+    VMWorkerProxy* p=handle;if(!p)return;
+    vmw_restart(p,VMW_MAX_LATENCY+VMW_FRAMES+1);
+}
+// Render-thread variant: clears only the dry span that can be read before it is rewritten.
+void vmw_resync(void* handle) {
+    VMWorkerProxy* p=handle;if(!p)return;
+    uint32_t intrinsic=__atomic_load_n(&p->shared->latency,__ATOMIC_ACQUIRE);
+    if(intrinsic>VMW_MAX_LATENCY)intrinsic=VMW_MAX_LATENCY;
+    vmw_restart(p,(uint64_t)p->quantum+intrinsic);
 }
 // Nonblocking RT transport. Late/crashed workers produce a latency-matched dry signal.
 void vmw_process(void* handle,float* audio,const float* side,int frames) {
