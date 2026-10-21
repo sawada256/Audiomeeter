@@ -18,19 +18,20 @@ struct SystemOutputControl: View {
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "speaker.wave.2.fill")
-                    Text(L10n.text("Mac出力: {0}", [current?.name ?? "—"])).lineLimit(1)
+                    Text(L10n.text("Mac出力: {0}", [current?.name ?? "—"])).lineLimit(1).truncationMode(.tail)
                 }
                 .font(VMTheme.fontDigit).foregroundColor(VMTheme.textPrimary)
             }
-            .menuStyle(.borderlessButton).fixedSize()
+            // Long device names truncate instead of pushing the VAIO button onto two lines.
+            .menuStyle(.borderlessButton).frame(maxWidth: 220, alignment: .leading)
             .help(L10n.text("アプリの音の出力先（コントロールセンターの「サウンド」と同じ設定）"))
             Button { appState.toggleSystemOutputVAIO() } label: {
-                Text("→ VAIO").font(VMTheme.fontDigit)
+                Text("→ VAIO").font(VMTheme.fontDigit).lineLimit(1).fixedSize()
                     .foregroundColor(appState.systemOutputIsVAIO ? .black : VMTheme.textAccent)
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(appState.systemOutputIsVAIO ? VMTheme.textAccent : Color.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 3))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.plain).fixedSize()
             .help(appState.systemOutputIsVAIO ? L10n.text("もう一度押すと直前の出力先に戻します") : L10n.text("Macの出力先をAudiomeeter VAIOにします"))
         }
         .padding(.horizontal, 6).padding(.vertical, 3)
