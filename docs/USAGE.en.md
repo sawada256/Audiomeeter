@@ -46,6 +46,12 @@ Configure always-visible/hold-to-show mode, corner and opacity. Select meters/fa
 
 Choose the recording source with SRC and format with FMT. Check the source meter before recording, then start/stop recording. The Finder button reveals recordings; the default folder is `~/Music/AudiomeeterRecordings`. Wait for finalization before starting another recording. Load a file into the player and select its destination. Very large playback files can consume substantial memory.
 
+## Mac output and device volume
+
+"Mac output" in the top bar selects where apps play sound (the same setting as Sound in Control Center). "→ VAIO" switches to Audiomeeter VAIO in one tap; press it again to return to the previous output.
+
+The bar under each A1–A5 device name is that device's macOS output volume. The device (driver) applies it last, to everything it plays, Audiomeeter's mix included. That is why speakers set to 0% stay silent after switching to VAIO with A1 on those speakers. B1/B2 share their OS volume with VAIO/AUX, normally held at 100%, so use their faders.
+
 ## Macro buttons, scenes, routing matrix and diagnostics
 
 Menu → "Macro Buttons and Scenes…" creates buttons like the original Macro Buttons. Modes: push (run once), toggle and momentary. Toggle buttons with the same group number act as radio buttons. Script example: `Strip[0].A1 = 1; Strip[3].Mute = toggle; Bus[1].Gain -= 3; Scene = "Streaming"; Recorder.Record = 1; Button[2].State = 0`. Indices count from 0 in the visible order (hardware inputs, VAIO, AUX; A1..., B1, B2). Each button can have a key and a MIDI control.

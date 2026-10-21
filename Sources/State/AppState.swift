@@ -54,6 +54,10 @@ public final class AppState: ObservableObject {
     @Published var desktopControls = DesktopControlsPreferences()
     @Published var desktopControlsStatus = ""
     @Published var systemOutputStrip: StripID?
+    @Published var systemOutputDeviceID: AudioObjectID?
+    @Published var busDeviceVolumes: [BusID: DeviceVolumeState] = [:]
+    var previousSystemOutputUID: String?
+    var lastDeviceVolumeEdit = Date.distantPast
     @Published var insertChainEnabled: [Int: Bool] = [:]
     // MIDI controller mappings (see AppState+MIDI.swift).
     @Published var midiMappings: [MIDIMapping] = []
@@ -706,6 +710,7 @@ public final class AppState: ObservableObject {
         var automaticPluginRestart: Bool?
         var hardwareInputCount: Int?
         var physicalBusCount: Int?
+        var previousSystemOutputUID: String?
         var macroButtons: [MacroButton]?
         var scenes: [MixerScene]?
     }
@@ -742,6 +747,7 @@ public final class AppState: ObservableObject {
         savedConfig.defaultBypassMode = defaultBypassMode; savedConfig.automaticPluginRestart = automaticPluginRestart
         savedConfig.hardwareInputCount = hardwareInputCount; savedConfig.physicalBusCount = physicalBusCount
         savedConfig.macroButtons = macroButtons; savedConfig.scenes = scenes
+        savedConfig.previousSystemOutputUID = previousSystemOutputUID
         if let data = try? JSONEncoder().encode(savedConfig) {
             try? data.write(to: settingsFileURL, options: .atomic)
         }
@@ -763,6 +769,7 @@ public final class AppState: ObservableObject {
         hardwareInputCount = min(5, max(3, config.hardwareInputCount ?? 3))
         physicalBusCount = min(5, max(3, config.physicalBusCount ?? 3))
         macroButtons = Array((config.macroButtons ?? []).prefix(64))
+        previousSystemOutputUID = config.previousSystemOutputUID
         scenes = Array((config.scenes ?? []).prefix(128))
         engine.disabledInsertTargets = Set(insertChainEnabled.filter { !$0.value }.compactMap { InsertTarget.from($0.key) })
         eqPresets = config.eqPresets ?? [:]
@@ -1026,8 +1033,16 @@ extension AppState {
                 requested[strip] = (device.id, uid)
             }
         }
+        var volumeDevices: [BusID: AudioObjectID] = [:]
+        for bus in visibleBuses where bus.isPhysical {
+            if let uid = buses[bus]?.deviceUID, let device = outputDevices.first(where: { $0.uid == uid }) { volumeDevices[bus] = device.id }
+        }
         // HAL queries may wait on IPC. Never run these periodic reads on the UI thread.
         appQueryQueue.async { [weak self] in
+            var volumes: [BusID: DeviceVolumeState] = [:]
+            for (bus, id) in volumeDevices {
+                volumes[bus] = DeviceVolumeState(deviceID: id, volume: AudioDeviceManager.shared.outputVolume(id: id), muted: AudioDeviceManager.shared.outputMuted(id: id))
+            }
             var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
             var defaultID: AudioObjectID = 0, size = UInt32(MemoryLayout<AudioObjectID>.size)
             let status = AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &defaultID)
@@ -1037,10 +1052,56 @@ extension AppState {
                 guard let self else { return }
                 self.appQueryInFlight = false
                 guard !self.isShuttingDown else { return }
+                if Date().timeIntervalSince(self.lastDeviceVolumeEdit) > 1.5, self.busDeviceVolumes != volumes { self.busDeviceVolumes = volumes }
+                if status == noErr, self.systemOutputDeviceID != defaultID { self.systemOutputDeviceID = defaultID }
                 guard self.appTrimRevision == revision else { self.pollAppVolumes(); return }
                 self.applyAppVolumes(defaultID: status == noErr ? defaultID : nil, values: values, requested: requested)
             }
         }
+    }
+
+    // MARK: macOS output device and device volume
+
+    /// Output devices the Mac can play to (Audiomeeter's mixer-only B1/B2 returns excluded).
+    var systemOutputChoices: [AudioDeviceInfo] {
+        outputDevices.filter { !["AudiomeeterB1_UID", "AudiomeeterB2_UID", "VoicemeeterB1_UID", "VoicemeeterB2_UID"].contains($0.uid) }
+    }
+    private var vaioPlaybackDevice: AudioDeviceInfo? {
+        outputDevices.first { $0.uid == strips[.virtualVAIO]?.deviceUID }
+            ?? outputDevices.first { ["Audiomeeter_UID", "Voicemeeter_UID"].contains($0.uid) }
+    }
+    var systemOutputIsVAIO: Bool { systemOutputDeviceID != nil && systemOutputDeviceID == vaioPlaybackDevice?.id }
+
+    func setSystemOutput(_ device: AudioDeviceInfo) {
+        do {
+            if let current = systemOutputDeviceID, current != vaioPlaybackDevice?.id, let uid = deviceManager.findDevice(byID: current)?.uid { previousSystemOutputUID = uid }
+            try deviceManager.setDefaultOutputDevice(id: device.id)
+            systemOutputDeviceID = device.id
+            saveSettings()
+        } catch { audioError = error.localizedDescription }
+    }
+    /// One tap: Mac output -> Audiomeeter VAIO, and a second tap returns to the previous device.
+    func toggleSystemOutputVAIO() {
+        if systemOutputIsVAIO {
+            guard let previous = outputDevices.first(where: { $0.uid == previousSystemOutputUID }) ?? systemOutputChoices.first(where: { $0.id != vaioPlaybackDevice?.id && !$0.uid.hasPrefix("Audiomeeter") && !$0.uid.hasPrefix("Voicemeeter") }) else { return }
+            setSystemOutput(previous)
+        } else if let vaio = vaioPlaybackDevice {
+            setSystemOutput(vaio)
+        } else { audioError = L10n.text("VAIOに割り当てたAudiomeeterデバイスが見つかりません。") }
+    }
+
+    /// The macOS volume of the device assigned to a physical bus. It is applied after the
+    /// mixer by the device/driver, so it trims everything Audiomeeter sends there.
+    func setBusDeviceVolume(_ bus: BusID, _ value: Float) {
+        guard let state = busDeviceVolumes[bus] else { return }
+        lastDeviceVolumeEdit = Date()
+        if deviceManager.setOutputVolume(id: state.deviceID, value) { busDeviceVolumes[bus]?.volume = min(1, max(0, value)) }
+    }
+    func toggleBusDeviceMute(_ bus: BusID) {
+        guard let state = busDeviceVolumes[bus], let muted = state.muted else { return }
+        lastDeviceVolumeEdit = Date()
+        deviceManager.setOutputMuted(id: state.deviceID, !muted)
+        busDeviceVolumes[bus]?.muted = !muted
     }
 
     private func applyAppVolumes(defaultID: AudioObjectID?, values: [StripID: Result<[VMAppClient], Error>], requested: [StripID: (AudioDeviceID, String)]) {
@@ -1095,4 +1156,11 @@ extension AppState {
         }
         pollAppVolumes()
     }
+}
+
+/// macOS output volume of a bus's device (nil fields: the device has no such control).
+struct DeviceVolumeState: Equatable {
+    var deviceID: AudioObjectID
+    var volume: Float?
+    var muted: Bool?
 }

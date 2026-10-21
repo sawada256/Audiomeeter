@@ -315,5 +315,16 @@ enum EnglishCatalog {
     "音量": "Levels",
     "項目がありません: {0}": "Missing item: {0}",
     "＋ ボタン": "+ Button",
+    "出力先を変更できませんでした (OSStatus {0})。": "Could not change the output (OSStatus {0}).",
+    "VAIOに割り当てたAudiomeeterデバイスが見つかりません。": "The Audiomeeter device assigned to VAIO was not found.",
+    "Mac出力: {0}": "Mac output: {0}",
+    "アプリの音の出力先（コントロールセンターの「サウンド」と同じ設定）": "Where apps play sound (same setting as Sound in Control Center)",
+    "もう一度押すと直前の出力先に戻します": "Press again to return to the previous output",
+    "Macの出力先をAudiomeeter VAIOにします": "Sets the Mac output to Audiomeeter VAIO",
+    "Macの出力音量（このデバイスでの最終的な音量）。0%やミュートだとAudiomeeterの音も聞こえません。": "The Mac's output volume for this device (the final level). At 0% or muted, Audiomeeter is silent on it too.",
+    "OS音量なし": "No OS volume",
+    "このデバイスにはmacOSの音量コントロールがありません。音量はフェーダーで調整します。": "This device has no macOS volume control. Use the fader.",
+    "フェーダーで調整": "Use fader",
+    "B1/B2のOS音量はVAIO/AUXと共通の設定で、通常は100%に維持されます。音量はB1/B2のフェーダーで調整してください。": "B1/B2 share their OS volume with VAIO/AUX, which is normally held at 100%. Use the B1/B2 faders.",
 ]
 }

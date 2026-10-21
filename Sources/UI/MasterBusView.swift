@@ -145,6 +145,7 @@ public struct MasterSectionView: View {
                         Text(device?.name ?? "None").font(.system(size: 8)).lineLimit(2)
                             .frame(height: 22, alignment: .top).frame(maxWidth: .infinity)
                             .help(device?.name ?? "None")
+                        DeviceVolumeBar(appState: appState, bus: bus).frame(height: 16)
                     }.frame(width: 82).foregroundStyle(bus.isPhysical ? VMTheme.ledAActive : VMTheme.ledBActive)
                 }
             }

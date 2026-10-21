@@ -115,6 +115,68 @@ public final class AudioDeviceManager {
         return status == noErr ? frames : 256
     }
 
+    // MARK: macOS default output and device volume
+
+    public func defaultOutputDeviceID() -> AudioObjectID { getDefaultDevice(isInput: false) }
+
+    /// Same as choosing the output in Control Center / System Settings > Sound.
+    public func setDefaultOutputDevice(id: AudioObjectID) throws {
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var value = id
+        let status = AudioObjectSetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, UInt32(MemoryLayout<AudioObjectID>.size), &value)
+        guard status == noErr else { throw AudioConfigurationError.message(L10n.text("出力先を変更できませんでした (OSStatus {0})。", [String(status)])) }
+    }
+
+    /// The device's own output volume (the macOS volume slider for that device). It is applied
+    /// by the device/driver to everything played through it, Audiomeeter's buses included.
+    /// Elements: the main control when present, otherwise the preferred stereo channels.
+    private func volumeElements(id: AudioObjectID, selector: AudioObjectPropertySelector) -> [UInt32] {
+        func settable(_ element: UInt32) -> Bool {
+            var address = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioDevicePropertyScopeOutput, mElement: element)
+            var flag: DarwinBoolean = false
+            return AudioObjectHasProperty(id, &address) && AudioObjectIsPropertySettable(id, &address, &flag) == noErr && flag.boolValue
+        }
+        if settable(kAudioObjectPropertyElementMain) { return [kAudioObjectPropertyElementMain] }
+        var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyPreferredChannelsForStereo, mScope: kAudioDevicePropertyScopeOutput, mElement: kAudioObjectPropertyElementMain)
+        var stereo: [UInt32] = [1, 2], size = UInt32(MemoryLayout<UInt32>.size * 2)
+        _ = AudioObjectGetPropertyData(id, &address, 0, nil, &size, &stereo)
+        return Array(Set(stereo)).sorted().filter(settable)
+    }
+    /// 0...1, or nil when the device has no software volume control (common for audio interfaces).
+    public func outputVolume(id: AudioObjectID) -> Float? {
+        let elements = volumeElements(id: id, selector: kAudioDevicePropertyVolumeScalar)
+        guard !elements.isEmpty else { return nil }
+        let values: [Float] = elements.compactMap { element in
+            var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyVolumeScalar, mScope: kAudioDevicePropertyScopeOutput, mElement: element)
+            var value: Float32 = 0, size = UInt32(MemoryLayout<Float32>.size)
+            return AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value) == noErr ? value : nil
+        }
+        return values.isEmpty ? nil : values.reduce(0, +) / Float(values.count)
+    }
+    @discardableResult
+    public func setOutputVolume(id: AudioObjectID, _ volume: Float) -> Bool {
+        var value = Float32(min(1, max(0, volume.isFinite ? volume : 0)))
+        var ok = false
+        for element in volumeElements(id: id, selector: kAudioDevicePropertyVolumeScalar) {
+            var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyVolumeScalar, mScope: kAudioDevicePropertyScopeOutput, mElement: element)
+            ok = AudioObjectSetPropertyData(id, &address, 0, nil, UInt32(MemoryLayout<Float32>.size), &value) == noErr || ok
+        }
+        return ok
+    }
+    public func outputMuted(id: AudioObjectID) -> Bool? {
+        guard let element = volumeElements(id: id, selector: kAudioDevicePropertyMute).first else { return nil }
+        var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyMute, mScope: kAudioDevicePropertyScopeOutput, mElement: element)
+        var value: UInt32 = 0, size = UInt32(MemoryLayout<UInt32>.size)
+        return AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value) == noErr ? value != 0 : nil
+    }
+    public func setOutputMuted(id: AudioObjectID, _ muted: Bool) {
+        var value: UInt32 = muted ? 1 : 0
+        for element in volumeElements(id: id, selector: kAudioDevicePropertyMute) {
+            var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyMute, mScope: kAudioDevicePropertyScopeOutput, mElement: element)
+            AudioObjectSetPropertyData(id, &address, 0, nil, UInt32(MemoryLayout<UInt32>.size), &value)
+        }
+    }
+
     /// Output-side device latency in frames: device + safety offset + one IO buffer.
     public func deviceLatency(id: AudioObjectID) -> Int {
         var total = 0

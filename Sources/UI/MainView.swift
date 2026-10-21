@@ -91,6 +91,8 @@ public struct MainView: View {
                 .background(Color.orange).cornerRadius(3)
             }
 
+            SystemOutputControl(appState: appState)
+
             // Real-time Engine Status Badges
             HStack(spacing: 8) {
                 // Engine Running LED
