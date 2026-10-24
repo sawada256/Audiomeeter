@@ -30,7 +30,7 @@ GitHubの自動生成Source code(zip/tar.gz)だけで対応ソース資材を代
 python3 Tools/verify_installers.py
 ```
 
-コミット済みでクリーンな状態が必要です。生成物はdistのみでGitへ入れません。既存の配布用ビルドを再パッケージする場合は `./build_installers.sh --skip-build`。GitHubへのアップロードは自動では行いません。
+コミット済みでクリーンな状態が必要です。未署名版は個人の開発用証明書（名前・メールアドレスが署名に入る）を使わず、必ずad-hoc署名で作られ、そうでなければ中止します。生成物はdistのみでGitへ入れません。既存の配布用ビルドを再パッケージする場合は `./build_installers.sh --skip-build`。GitHubへのアップロードは自動では行いません。
 
 ## 一般配布の前
 

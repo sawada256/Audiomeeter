@@ -30,7 +30,7 @@ Before publishing, link to tagged docs and add the exact revision, tested enviro
 python3 Tools/verify_installers.py
 ```
 
-Requires a clean committed tree. Outputs remain in ignored dist/. To repackage an existing marked release build, use `./build_installers.sh --skip-build`. Nothing is uploaded automatically.
+Requires a clean committed tree. Unsigned packages are always ad-hoc signed and the build stops otherwise, so a personal development certificate (which embeds the developer's name and email) never ends up in a release. Outputs remain in ignored dist/. To repackage an existing marked release build, use `./build_installers.sh --skip-build`. Nothing is uploaded automatically.
 
 ## Before general distribution
 

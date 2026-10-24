@@ -26,6 +26,10 @@ def build(skip_build=False, signed=False):
         env = dict(os.environ,VM_RELEASE_BUILD='1')
         if signed:
             env.update(VM_DISTRIBUTION_SIGN='1',VM_DRIVER_SIGNING_IDENTITY=app_id)
+        else:
+            # Never let a local "Apple Development" identity (which embeds the developer's
+            # name and email in the signature) into published test packages: sign ad-hoc.
+            env.update(VM_CODESIGN_IDENTITY='-')
         run('./build_app.sh',env=env); run('./Drivers/build_all_drivers.sh',env=env)
     app = ROOT/'Audiomeeter.app'
     info = plistlib.loads((app/'Contents/Info.plist').read_bytes())
@@ -35,14 +39,15 @@ def build(skip_build=False, signed=False):
     label = f'{version}-{number}-arm64'+('' if signed else '-LOCAL-UNSIGNED')
     def verify_code(path):
         run('codesign','--verify','--deep','--strict',path)
+        result = subprocess.run(['codesign','-dv','--verbose=4',str(path)],capture_output=True,text=True,check=True)
+        details = result.stderr
         if signed:
-            result = subprocess.run(['codesign','-dv','--verbose=4',str(path)],capture_output=True,text=True,check=True)
-            details = result.stderr
             if 'Authority=Developer ID Application:' not in details or 'runtime' not in details:
                 raise SystemExit(f'Refusing non-distribution-signed code: {path}')
-    if signed:
-        for path in [app, app/'Contents/Helpers/VMPluginWorker.app',app/'Contents/Frameworks/libVMPluginHost.dylib']:
-            verify_code(path)
+        elif 'Signature=adhoc' not in details or 'Authority=' in details:
+            raise SystemExit(f'Unsigned packages must be ad-hoc signed (no personal certificate): {path}')
+    for path in [app, app/'Contents/Helpers/VMPluginWorker.app',app/'Contents/Frameworks/libVMPluginHost.dylib']:
+        verify_code(path)
     results = []
     with tempfile.TemporaryDirectory(prefix='Audiomeeter-packages-',dir=ROOT/'.build') as temporary:
         stage = Path(temporary)
