@@ -16,7 +16,7 @@ Run `./Tests/run_audio_tests.sh`, `./build_app.sh`, `./Drivers/build_all_drivers
 
 ## Remaining release gates
 
-- Developer ID signing/notarization and clean-machine package installation, update/recovery and removal remain unverified. New Audiomeeter HAL packages have not been installed on this development Mac; selected live checks used legacy HALs.
+- Developer ID signing/notarization and clean-machine package installation, update/recovery and removal remain unverified. The 1.1.0 driver package was installed on the development Mac (macOS 26) on 2026-10-24: all four devices appear, per-app trims work and VAIO/B1 and AUX/B2 duplex signals stay isolated.
 - Test UMC channel outputs, multiple USB/Bluetooth devices, sleep/wake, hotplug and supported macOS versions. Unusual stream formats are not comprehensively tested.
 - Restore exact historical BlackHole checkout provenance; finalize dependency inventory and name/UI trademark review. The owner confirmed the icon is AI-generated original artwork, which is not trademark clearance.
 - Process separation is not a security sandbox: plugins can access files/network and exhaust resources. Commercial plugin/activation compatibility is not exhaustive.
