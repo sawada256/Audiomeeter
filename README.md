@@ -8,7 +8,7 @@ Apple Silicon / macOS 14以降向けの、ルーティング自由度の高い�
 > Audiomeeterは、Windows向けの仮想ミキサー [Voicemeeter](https://vb-audio.com/Voicemeeter/)（VB-Audio Software）の操作感を参考に、macOS向けに独自に実装したソフトウェアです。VB-Audioとは無関係で、公式製品・公認製品ではなく、設定ファイル・ドライバー・音質の互換性もありません。Voicemeeterのコード・画像・ロゴは使用していません。
 > 名称・外観・その他の点で権利者や関係者から問題の指摘があった場合は、速やかにこのリポジトリを非公開にし、修正または公開停止で対応します。ご連絡は [Issues](https://github.com/sawada256/Audiomeeter/issues) へお願いします。
 
-[導入](docs/INSTALL.ja.md) · [使い方](docs/USAGE.ja.md) · [本家との違い](docs/COMPARISON.ja.md) · [EQ・PAD](docs/PADS_SPECTRUM.ja.md) · [出力バス](docs/OUTPUT_BUS.ja.md) · [配布物](docs/DISTRIBUTION.ja.md) · [ライセンス](docs/LICENSING.ja.md) · [既知の課題](docs/AUDIT.ja.md) · [設計レビュー](docs/REVIEW_2026-10.ja.md) · [開発](docs/DEVELOPMENT.ja.md)
+[導入・削除](docs/INSTALL.ja.md) · [使い方](docs/USAGE.ja.md) · [EQ・PAD](docs/PADS_SPECTRUM.ja.md) · [出力バス](docs/OUTPUT_BUS.ja.md) · [本家との違い](docs/COMPARISON.ja.md)
 
 ## ダウンロード
 
@@ -18,9 +18,13 @@ Apple Silicon / macOS 14以降向けの、ルーティング自由度の高い�
 |---|---|
 | `Audiomeeter-App-*.pkg` | 本体（`/Applications/Audiomeeter.app`）とVST3ホスト |
 | `Audiomeeter-Drivers-*.pkg` | 専用仮想デバイス **Audiomeeter VAIO / AUX / B1 / B2**（Core Audio HALドライバー） |
-| `Audiomeeter-Source-*.tar.gz` | そのバイナリに対応するソース一式（ライセンス上の対応ソース） |
 
-本体 → ドライバーの順に開いて導入します。現在の配布物は**パッケージ署名・Appleの公証を行っていない試験版**です。macOSにブロックされた場合の扱いと、ソースからの導入方法は[導入手順](docs/INSTALL.ja.md)を参照してください。
+1. Audiomeeterと音声アプリ（通話・DAW等）を終了します。
+2. `Audiomeeter-App-*.pkg` を開いて導入します。
+3. VAIO/AUX/B1/B2の専用デバイスを使う場合は `Audiomeeter-Drivers-*.pkg` も導入します（Mac全体の音声が数秒止まります）。
+4. Audiomeeterを開き、マイクの使用を許可します。
+
+現在の配布物は**署名・Appleの公証を行っていない試験版**です。macOSに開けないと表示された場合は、入手元を確認したうえで「システム設定 → プライバシーとセキュリティ」の「このまま開く」から許可できます。詳しくは[導入・削除](docs/INSTALL.ja.md)を参照してください。
 
 ## 画面構成
 
@@ -110,23 +114,30 @@ DAWとの組み合わせは[使い方](docs/USAGE.ja.md)を参照してくださ
 
 - Apple Silicon Mac、macOS 14以降。処理はステレオ（32bit float）。
 - 対応プラグインはARM64のVST3エフェクトのみ（VST2・AU・Intel専用・インストゥルメントは非対応）。
-- 配布物は未署名・未公証の試験版です。一般配布向けの署名・公証、各macOS版での網羅的な実機検証は未完了です（[既知の課題](docs/AUDIT.ja.md)）。
-- 本家Voicemeeterの全機能（VBAN、サラウンド等）や設定との互換はありません（[本家との違い](docs/COMPARISON.ja.md)）。
+- 試験版のため、署名・公証がなく、すべての機器・macOSの組み合わせでは確認できていません。音量を下げてから使い始めてください。
+- VST3プラグインは別プロセスで動きますが、プラグイン自体の安全性を保証するものではありません。信頼できるプラグインだけを使ってください。
+- 本家Voicemeeterの全機能（ネットワーク送受信、サラウンド等）や設定ファイルとの互換はありません（[本家との違い](docs/COMPARISON.ja.md)）。
+
+## 困ったときは
+
+- **音が出ない**: 入力・出力のMute、A1の出力先、バス見出しの下のMac音量（0%やミュートだと聞こえません）、上部の「Mac出力」がAudiomeeter VAIOになっているかを確認します。Menu → 「診断…」で各経路の状態も確認できます。
+- **音が途切れる**: オーディオ設定でバッファサイズを大きくします。
+- **専用デバイスが一覧に出ない**: ドライバーpkgを導入後、Macを再起動します。
+- 不具合の報告・要望は [Issues](https://github.com/sawada256/Audiomeeter/issues) へどうぞ。
 
 ## ソースからのビルド
 
+pkgを使わずに自分でビルドすることもできます（Xcode Command Line Tools、CMake 3.22以降、Python 3が必要）。
+
 ```sh
-xcode-select --install
 git clone https://github.com/sawada256/Audiomeeter.git
 cd Audiomeeter
 ./install_app.sh        # 本体をビルドして /Applications へ導入
 ./install_drivers.sh    # 専用デバイスをビルドして導入（管理者認証）
 ```
 
-CMake 3.22以降とPython 3が必要です。JUCEは固定コミットを自動取得します。テストは `./Tests/run_audio_tests.sh`。詳しくは[開発](docs/DEVELOPMENT.ja.md)。
-
 ## ライセンス
 
-アプリ・VST3ホスト・配布ツールは **AGPL-3.0-only**、専用HALドライバー（[BlackHole](https://github.com/ExistentialAudio/BlackHole)の改変版）は **GPL-3.0-only** です。JUCE・VST3 SDK等の依存物は各ライセンスに従います。[LICENSE](LICENSE.md)・[第三者通知](THIRD_PARTY_NOTICES.ja.md)を参照してください。
+アプリ・VST3ホスト・配布ツールは **AGPL-3.0-only**、専用HALドライバー（[BlackHole](https://github.com/ExistentialAudio/BlackHole)の改変版）は **GPL-3.0-only** です。JUCE・VST3 SDK等の依存物は各ライセンスに従います。[LICENSE](LICENSE.md)・[第三者通知](THIRD_PARTY_NOTICES.ja.md)を参照してください。各Releaseには、そのバイナリに対応するソース（`Audiomeeter-Source-*.tar.gz`）を添付しています。
 
 Voicemeeter は VB-Audio Software の商標です。その他の製品名は各社の商標です。

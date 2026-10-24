@@ -29,10 +29,10 @@ These scripts build from source, not a portable installation without developer t
 
 ## First launch and permissions
 
-Allow microphone access. Media-key capture needs Accessibility permission for Audiomeeter itself; launch at login may require OS approval. Select hardware output A1 and Audiomeeter VAIO/AUX inputs. Legacy selections are not automatically migrated: reselect devices in macOS and your DAW. See [first sound and DAW routing](USAGE.en.md).
+Allow microphone access. Media-key capture needs Accessibility permission for Audiomeeter itself; launch at login may require OS approval. Select hardware output A1 and Audiomeeter VAIO/AUX inputs. Then choose the Audiomeeter devices as outputs/inputs in macOS, calling apps and your DAW. See [first sound and DAW routing](USAGE.en.md).
 
 Settings live in `~/Library/Application Support/Audiomeeter`; recordings in `~/Music/AudiomeeterRecordings`. Updates preserve these. Japanese is the default; select English in Audio Settings → 言語 / Language.
 
 ## Removal and recovery
 
-Quit and move the app to Trash. With administrator rights, move only Audiomeeter.driver, AudiomeeterAUX.driver, AudiomeeterB1.driver and AudiomeeterB2.driver out of the HAL directory, then restart macOS. Preserve legacy/other-vendor files. Restore saved app/HAL bundles to their original locations for recovery, checking ownership/permissions as administrator before rebooting. Back up settings and recordings separately as needed.
+Quit and move the app to Trash. With administrator rights, move only Audiomeeter.driver, AudiomeeterAUX.driver, AudiomeeterB1.driver and AudiomeeterB2.driver out of the HAL directory, then restart macOS. Do not remove other vendors' driver files. Restore saved app/HAL bundles to their original locations for recovery, checking ownership/permissions as administrator before rebooting. Back up settings and recordings separately as needed.

@@ -8,7 +8,7 @@ A flexible stereo virtual audio mixer for Apple Silicon / macOS 14+. Route micro
 > Audiomeeter is an independent macOS implementation inspired by the workflow of [Voicemeeter](https://vb-audio.com/Voicemeeter/) for Windows (VB-Audio Software). It is not affiliated with, endorsed by or an official product of VB-Audio, and it is not compatible with Voicemeeter's settings, drivers or sound. No Voicemeeter code, images or logos are used.
 > If the rights holder or anyone concerned raises an issue about the name, appearance or anything else, this repository will promptly be made private and then corrected or withdrawn. Please get in touch through [Issues](https://github.com/sawada256/Audiomeeter/issues).
 
-[Installation](docs/INSTALL.en.md) · [User guide](docs/USAGE.en.md) · [Comparison](docs/COMPARISON.en.md) · [EQ/pads](docs/PADS_SPECTRUM.en.md) · [Output buses](docs/OUTPUT_BUS.en.md) · [Release contents](docs/DISTRIBUTION.en.md) · [Licensing](docs/LICENSING.en.md) · [Known issues](docs/AUDIT.en.md) · [Design review](docs/REVIEW_2026-10.en.md) · [Development](docs/DEVELOPMENT.en.md)
+[Install & uninstall](docs/INSTALL.en.md) · [User guide](docs/USAGE.en.md) · [EQ/pads](docs/PADS_SPECTRUM.en.md) · [Output buses](docs/OUTPUT_BUS.en.md) · [Comparison](docs/COMPARISON.en.md)
 
 ## Download
 
@@ -18,9 +18,13 @@ Get the installers from [Releases](https://github.com/sawada256/Audiomeeter/rele
 |---|---|
 | `Audiomeeter-App-*.pkg` | The app (`/Applications/Audiomeeter.app`) and VST3 host |
 | `Audiomeeter-Drivers-*.pkg` | Dedicated virtual devices **Audiomeeter VAIO / AUX / B1 / B2** (Core Audio HAL drivers) |
-| `Audiomeeter-Source-*.tar.gz` | Complete corresponding source for those binaries |
 
-Install the app, then the drivers. Current packages are **test builds without package signing or Apple notarization**. See [Installation](docs/INSTALL.en.md) for what to do if macOS blocks them, and for building from source.
+1. Quit Audiomeeter and audio apps (calling apps, DAWs).
+2. Open `Audiomeeter-App-*.pkg` and install.
+3. To use the dedicated VAIO/AUX/B1/B2 devices, also install `Audiomeeter-Drivers-*.pkg` (all Mac audio pauses for a few seconds).
+4. Open Audiomeeter and allow microphone access.
+
+Current packages are **test builds without signing or Apple notarization**. If macOS refuses to open them, check where you downloaded them and use "Open Anyway" in System Settings → Privacy & Security. See [Install & uninstall](docs/INSTALL.en.md).
 
 ## Layout
 
@@ -110,23 +114,30 @@ See the [user guide](docs/USAGE.en.md) for DAW setups.
 
 - Apple Silicon Mac, macOS 14 or later. Stereo processing (32-bit float).
 - ARM64 VST3 effects only (no VST2, AU, Intel-only plugins or instruments).
-- Packages are unsigned, unnotarized test builds. Signing/notarization for general distribution and broad hardware testing across macOS versions are not complete ([Known issues](docs/AUDIT.en.md)).
-- Not a replacement for every Voicemeeter feature (VBAN, surround and others) and not settings-compatible ([Comparison](docs/COMPARISON.en.md)).
+- This is a test build: unsigned, unnotarized and not tested with every device and macOS combination. Turn volumes down before you start.
+- VST3 plugins run in separate processes, but that does not make a plugin itself safe. Use plugins you trust.
+- Not a replacement for every Voicemeeter feature (network audio, surround and others) and not settings-compatible ([Comparison](docs/COMPARISON.en.md)).
+
+## Troubleshooting
+
+- **No sound**: check input/output Mute, the A1 device, the Mac volume bar under the bus header (0% or muted is silent), and that "Mac output" at the top is Audiomeeter VAIO. Menu → "Diagnostics…" shows the state of every path.
+- **Dropouts**: increase the buffer size in Audio Settings.
+- **Dedicated devices missing**: restart the Mac after installing the driver package.
+- Report problems or ideas in [Issues](https://github.com/sawada256/Audiomeeter/issues).
 
 ## Building from source
 
+You can also build it yourself instead of using the packages (requires Xcode Command Line Tools, CMake 3.22+ and Python 3).
+
 ```sh
-xcode-select --install
 git clone https://github.com/sawada256/Audiomeeter.git
 cd Audiomeeter
 ./install_app.sh        # build and install the app to /Applications
 ./install_drivers.sh    # build and install the dedicated devices (admin authentication)
 ```
 
-Requires CMake 3.22+ and Python 3; JUCE is fetched at a pinned commit. Run tests with `./Tests/run_audio_tests.sh`. See [Development](docs/DEVELOPMENT.en.md).
-
 ## License
 
-The app, VST3 host and packaging tools are **AGPL-3.0-only**; the dedicated HAL drivers (modified from [BlackHole](https://github.com/ExistentialAudio/BlackHole)) are **GPL-3.0-only**. Dependencies such as JUCE and the VST3 SDK keep their own terms. See [LICENSE](LICENSE.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
+The app, VST3 host and packaging tools are **AGPL-3.0-only**; the dedicated HAL drivers (modified from [BlackHole](https://github.com/ExistentialAudio/BlackHole)) are **GPL-3.0-only**. Dependencies such as JUCE and the VST3 SDK keep their own terms. See [LICENSE](LICENSE.md) and [third-party notices](THIRD_PARTY_NOTICES.md). Each Release includes the corresponding source for its binaries (`Audiomeeter-Source-*.tar.gz`).
 
 Voicemeeter is a trademark of VB-Audio Software. Other product names are trademarks of their respective owners.

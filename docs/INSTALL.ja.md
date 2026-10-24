@@ -29,10 +29,10 @@ open /Applications/Audiomeeter.app
 
 ## 初期設定・許可
 
-本体を開きマイク許可を与えます。音量キー捕捉にはAudiomeeter自身へのアクセシビリティ許可、ログイン時起動にはOS側の許可が必要になる場合があります。A1に物理出力、VAIO/AUXにAudiomeeter VAIO/AUXを選びます。旧ドライバの設定は自動で新ドライバへ変わらないため、macOS・DAW側も選び直してください。[音出しとDAWの手順](USAGE.ja.md)。
+本体を開きマイク許可を与えます。音量キー捕捉にはAudiomeeter自身へのアクセシビリティ許可、ログイン時起動にはOS側の許可が必要になる場合があります。A1に物理出力、VAIO/AUXにAudiomeeter VAIO/AUXを選び、macOS・通話アプリ・DAW側でも出力先・入力にAudiomeeterの各デバイスを選びます。[音出しとDAWの手順](USAGE.ja.md)。
 
 設定は `~/Library/Application Support/Audiomeeter`、録音は `~/Music/AudiomeeterRecordings`。更新でこれらを削除しません。日本語が初期値で、オーディオ設定の「言語 / Language」から英語へ切り替えます。
 
 ## 削除・復旧
 
-アプリを終了してゴミ箱へ移動します。HALの削除は管理者権限で、Audiomeeter.driver、AudiomeeterAUX.driver、AudiomeeterB1.driver、AudiomeeterB2.driverだけをHALフォルダ外へ退避し、macOSを再起動します。他社や旧Voicemeeterのファイルを削除しないでください。復旧は保存済みの同名アプリ／HALを元の位置へ戻し、所有権・許可を管理者で確認後再起動します。設定・録音は必要に応じて別途バックアップします。
+アプリを終了してゴミ箱へ移動します。HALの削除は管理者権限で、Audiomeeter.driver、AudiomeeterAUX.driver、AudiomeeterB1.driver、AudiomeeterB2.driverだけをHALフォルダ外へ退避し、macOSを再起動します。他社製ドライバーのファイルは削除しないでください。復旧は保存済みの同名アプリ／HALを元の位置へ戻し、所有権・許可を管理者で確認後再起動します。設定・録音は必要に応じて別途バックアップします。
