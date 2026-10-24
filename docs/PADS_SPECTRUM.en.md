@@ -2,7 +2,7 @@
 
 # Input pads and EQ spectrum
 
-The hardware-input pad switches between PAN, INTELLIPAN, MODULATION, PITCH and FORMANT (EXP). Use its selector or right-click to cycle modes in the same area. Standard PAN supports center snapping and double-click reset. INTELLIPAN Bright/Dark uses tonal shelves, not simple high/low-pass filters.
+The hardware-input pad switches between PAN, COLOR PAN, MODULATION, PITCH and FORMANT (EXP). Use its selector or right-click to cycle modes in the same area. Standard PAN supports center snapping and double-click reset. INTELLIPAN Bright/Dark uses tonal shelves, not simple high/low-pass filters.
 
 MODULATION provides chorus-like modulation; PITCH is a lightweight pitch effect. FORMANT is a separate experimental pad moving fixed resonances, not precise vocal-tract analysis or pitch-independent formant resynthesis. Treat it as a creative voice effect rather than a commercial voice-conversion algorithm.
 

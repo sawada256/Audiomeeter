@@ -28,12 +28,12 @@ struct MixerScene: Codable, Identifiable, Equatable {
     static func merge(_ saved: StripSettings, into current: StripSettings, scope: SceneScope) -> StripSettings {
         var next = current
         if scope.routing { next.routing = saved.routing }
-        if scope.levels { next.gainDB = saved.gainDB; next.pan = saved.pan; next.intellipan.x = saved.intellipan.x }
+        if scope.levels { next.gainDB = saved.gainDB; next.pan = saved.pan; next.colorPad.x = saved.colorPad.x }
         if scope.mutes { next.isMuted = saved.isMuted; next.isSolo = saved.isSolo }
         if scope.eq { next.eq = saved.eq }
         if scope.dynamics {
             next.dynamics = saved.dynamics; next.isKaraoke = saved.isKaraoke; next.padMode = saved.padMode
-            next.intellipan.y = saved.intellipan.y; next.padModulation = saved.padModulation
+            next.colorPad.y = saved.colorPad.y; next.padModulation = saved.padModulation
             next.padPitch = saved.padPitch; next.padFormant = saved.padFormant; next.pitchSmooth = saved.pitchSmooth
         }
         return next

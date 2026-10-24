@@ -145,7 +145,7 @@ public final class AudiomeeterEngine {
     private var feedbackBusTaps: [BusID: UnsafeMutablePointer<Float>] = [:]
     private var currentPans: [StripID: Float] = [:]
     private func internalBus(_ uid: String?) -> BusID? {
-        switch uid { case "AudiomeeterB1_UID", "VoicemeeterB1_UID": return .B1; case "AudiomeeterB2_UID", "VoicemeeterB2_UID": return .B2; default: return nil }
+        DedicatedDevice.returnBus(uid)
     }
     private var stripTaps: [StripID: UnsafeMutablePointer<Float>] = [:]
     private var stripHistories: [StripID: StereoSampleHistory] = [:]
@@ -778,12 +778,12 @@ public final class AudiomeeterEngine {
                     gainDB: setting.gainDB,
                     isMuted: effectivelyMuted,
                     dynamicsConfig: setting.dynamics,
-                    intellipan: setting.intellipan,
+                    colorPad: setting.colorPad,
                     eq: setting.eq,
                     isVirtual: strip.isVirtual,
                     isKaraoke: setting.isKaraoke,
-                    padMode: setting.padMode ?? .intellipan,
-                    padState: setting.padMode == .pitch ? (setting.padPitch ?? IntellipanState()) : setting.padMode == .formant ? (setting.padFormant ?? IntellipanState()) : (setting.padModulation ?? IntellipanState()),
+                    padMode: setting.padMode ?? .colorPan,
+                    padState: setting.padMode == .pitch ? (setting.padPitch ?? PadState()) : setting.padMode == .formant ? (setting.padFormant ?? PadState()) : (setting.padModulation ?? PadState()),
                     pitchSmooth: setting.pitchSmooth ?? false
                 )
 
@@ -796,7 +796,7 @@ public final class AudiomeeterEngine {
                     mixBuf[frame * 2 + 1] *= smoothedPan < 0 ? 1 + smoothedPan : 1
                 }
                 currentPans[strip] = pan
-                nodeLatencies[node] = processInserts(chains, target: .strip(strip), position: .post, buffer: mixBuf, upstream: preLatency + (strip.isVirtual ? 0 : InputPadDSP.latencyFrames(mode: setting.padMode ?? .intellipan, smooth: setting.pitchSmooth ?? false, rate: Float(engineSampleRate))), frames: clampedFrames, alignSidechains: sidechainAlignment)
+                nodeLatencies[node] = processInserts(chains, target: .strip(strip), position: .post, buffer: mixBuf, upstream: preLatency + (strip.isVirtual ? 0 : InputPadDSP.latencyFrames(mode: setting.padMode ?? .colorPan, smooth: setting.pitchSmooth ?? false, rate: Float(engineSampleRate))), frames: clampedFrames, alignSidechains: sidechainAlignment)
                 if effectivelyMuted { memset(mixBuf, 0, clampedFrames * 8) }
                 // Unrouted (e.g. hidden) strips skip the history so its memory is never committed.
                 let routed = allBuses.contains { setting.routing[$0] }

@@ -89,7 +89,7 @@ struct AudioRegressionTests {
         var samples = [Float](repeating: 0.25, count: 512)
         let strip = StripDSP()
         samples.withUnsafeMutableBufferPointer {
-            strip.process(buffer: $0.baseAddress!, frames: 256, sampleRate: 48000, gainDB: 0, isMuted: false, dynamicsConfig: DynamicsConfig(), intellipan: IntellipanState(), eq: EQ3Band(), isVirtual: true)
+            strip.process(buffer: $0.baseAddress!, frames: 256, sampleRate: 48000, gainDB: 0, isMuted: false, dynamicsConfig: DynamicsConfig(), colorPad: PadState(), eq: EQ3Band(), isVirtual: true)
         }
         precondition(samples.allSatisfy { abs($0 - 0.25) < 0.00001 }, "Neutral strip must retain unity gain")
         let bus = BusDSP()

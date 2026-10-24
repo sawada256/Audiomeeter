@@ -5,14 +5,14 @@ struct InputPadView: View {
     @ObservedObject var appState: AppState
     let strip: StripID
     private var settings: StripSettings { appState.strips[strip] ?? StripSettings() }
-    private var mode: InputPadMode { settings.padMode ?? .intellipan }
-    private var state: IntellipanState {
+    private var mode: InputPadMode { settings.padMode ?? .colorPan }
+    private var state: PadState {
         switch mode {
-        case .intellipan: return settings.intellipan
-        case .pan: return IntellipanState(x:settings.pan ?? 0,y:0)
-        case .modulation: return settings.padModulation ?? IntellipanState()
-        case .pitch: return settings.padPitch ?? IntellipanState()
-        case .formant: return settings.padFormant ?? IntellipanState()
+        case .colorPan: return settings.colorPad
+        case .pan: return PadState(x:settings.pan ?? 0,y:0)
+        case .modulation: return settings.padModulation ?? PadState()
+        case .pitch: return settings.padPitch ?? PadState()
+        case .formant: return settings.padFormant ?? PadState()
         }
     }
     var body: some View {
@@ -37,8 +37,8 @@ struct InputPadView: View {
 }
 private struct PadSurface: NSViewRepresentable {
     let mode: InputPadMode
-    let state: IntellipanState
-    let changed: (IntellipanState)->Void
+    let state: PadState
+    let changed: (PadState)->Void
     let next: ()->Void
     func makeNSView(context:Context)->Surface { Surface() }
     func updateNSView(_ view:Surface,context:Context) {
@@ -46,13 +46,13 @@ private struct PadSurface: NSViewRepresentable {
         view.setAccessibilityLabel(mode.rawValue);view.setAccessibilityValue("\(state.x), \(state.y)")
     }
     final class Surface: NSView {
-        var mode=InputPadMode.intellipan, state=IntellipanState()
-        var changed: ((IntellipanState)->Void)?, next:(()->Void)?
+        var mode=InputPadMode.colorPan, state=PadState()
+        var changed: ((PadState)->Void)?, next:(()->Void)?
         override var acceptsFirstResponder:Bool { true }
         override func acceptsFirstMouse(for event:NSEvent?)->Bool { true }
         override func mouseDown(with event:NSEvent) {
             window?.makeKey();window?.makeFirstResponder(self)
-            if event.clickCount==2 { changed?(IntellipanState());return }
+            if event.clickCount==2 { changed?(PadState());return }
             move(event)
         }
         override func mouseDragged(with event:NSEvent) { move(event) }
@@ -62,7 +62,7 @@ private struct PadSurface: NSViewRepresentable {
             var x=Float((p.x-8)/max(1,bounds.width-16)*2-1)
             var y=Float((p.y-12)/max(1,bounds.height-24)*2-1)
             if abs(x)<0.045 { x=0 };if abs(y)<0.045 { y=0 }
-            changed?(IntellipanState(x:max(-1,min(1,x)),y:mode == .pan ? 0 : max(-1,min(1,y))))
+            changed?(PadState(x:max(-1,min(1,x)),y:mode == .pan ? 0 : max(-1,min(1,y))))
         }
         override func draw(_ dirtyRect:NSRect) {
             NSColor(white:0.07,alpha:1).setFill();bounds.fill()
@@ -74,7 +74,7 @@ private struct PadSurface: NSViewRepresentable {
             let labels: (String,String,String)
             switch mode {
             case .pan: labels=("L","R",abs(state.x)<0.005 ? "C" : String(format:"%@ %.0f",state.x<0 ? "L":"R",abs(state.x)*100))
-            case .intellipan: labels=("L","R","BRIGHT ↑ • DARK ↓")
+            case .colorPan: labels=("L","R","BRIGHT ↑ • DARK ↓")
             case .modulation: labels=("SLOW","FAST","DEPTH ↑")
             case .pitch: labels=("−12 st","+12 st",String(format:"%+.1f st • %.0f%%",state.x*12,(1-abs(state.y)*0.75)*100))
             case .formant: labels=("LOW","HIGH","RESONANCE ↑ • EXP")

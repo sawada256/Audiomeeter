@@ -21,4 +21,4 @@ The exact initial BlackHole checkout has not been reconstructed. Final dependenc
 
 Official references: [pinned JUCE license](https://github.com/juce-framework/JUCE/blob/8.0.12/LICENSE.md), [JUCE commercial agreement](https://juce.com/legal/juce-8-licence/), [BlackHole source/license](https://github.com/ExistentialAudio/BlackHole), [Steinberg SDK information](https://www.steinberg.net/developers/).
 
-This describes implementation dependencies, not a guarantee of legal clearance. The repository is privately managed at the owner's request; public distribution remains separate.
+This describes implementation dependencies, not a guarantee of legal clearance. The repository is public; if the rights holder or others raise a concern, it will be made private while the concern is addressed.

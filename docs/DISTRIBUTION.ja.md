@@ -2,20 +2,20 @@
 
 # GitHub Releasesに添付するもの
 
-現時点は**非公開リポジトリの試験版**です。Releaseは未作成で、リポジトリの一般公開やRelease公開は別途行います。以下を同じReleaseに添付します。
+公開リポジトリのGitHub Releasesに、以下を同じReleaseとして添付します。署名・公証のない試験版です。
 
 | 資材 | 用途 |
 |---|---|
-| `Audiomeeter-App-1.0.0-12-arm64-LOCAL-UNSIGNED.pkg` | 本体・プラグインホスト・ライセンス |
-| `Audiomeeter-Drivers-1.0.0-12-arm64-LOCAL-UNSIGNED.pkg` | VAIO/AUX/B1/B2の4HAL |
-| `Audiomeeter-Source-1.0.0-12.tar.gz` | そのバイナリに対応するソース、改変HAL、固定JUCE、導入シェル・文書 |
-| `release-manifest-1.0.0-12-arm64-LOCAL-UNSIGNED.json` | ソースコミットと各ファイルのSHA-256 |
+| `Audiomeeter-App-1.1.0-13-arm64-LOCAL-UNSIGNED.pkg` | 本体・プラグインホスト・ライセンス |
+| `Audiomeeter-Drivers-1.1.0-13-arm64-LOCAL-UNSIGNED.pkg` | VAIO/AUX/B1/B2の4HAL |
+| `Audiomeeter-Source-1.1.0-13.tar.gz` | そのバイナリに対応するソース、改変HAL、固定JUCE、導入シェル・文書 |
+| `release-manifest-1.1.0-13-arm64-LOCAL-UNSIGNED.json` | ソースコミットと各ファイルのSHA-256 |
 
-GitHubの自動生成Source code(zip/tar.gz)だけで対応ソース資材を代用しないでください。対応ソースの取得場所・アクセスはバイナリの受領者にも提供します。非公開リポジトリのReleaseは招待された利用者しかアクセスできません。
+GitHubの自動生成Source code(zip/tar.gz)だけで対応ソース資材を代用しないでください。対応ソースの取得場所・アクセスはバイナリの受領者にも提供します。リポジトリを非公開にした場合でも、すでにバイナリを受け取った人が対応ソースを入手できるよう、別途提供します。
 
 ## Release本文テンプレート
 
-> Audiomeeter 1.0.0 build 12 — private test / 非公開試験版
+> Audiomeeter 1.1.0 build 13 — test build / 試験版
 > Apple Silicon / macOS 14+ only. Not notarized; installer packages unsigned. / 未公証・パッケージ署名なし。
 > Install App, then Drivers if virtual routing is needed. Quit audio apps first; driver installation restarts Core Audio. / 本体→必要ならドライバの順。事前に音声アプリを終了。
 > See Installation / User guide / Known issues in both languages. Corresponding source and SHA-256 manifest are attached. / 日英導入・操作・既知の課題を参照。対応ソースとハッシュ同梱。

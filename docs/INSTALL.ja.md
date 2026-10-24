@@ -8,7 +8,7 @@ Apple Silicon、macOS 14以降。本体pkgとドライバpkgはビルドツー�
 
 現在の `LOCAL-UNSIGNED` はパッケージ署名・公証なしの試験資材です。ブロックされた場合、信頼できる取得元とハッシュを確認したうえで、システム設定 → プライバシーとセキュリティに表示される「このまま開く」を使用できます。OS版・組織の管理ポリシー等により許可できない場合があります。マルウェア検出や破損警告を無視せず、その場合は停止してください。Gatekeeper全体の無効化を前提にしません。[Apple公式手順](https://support.apple.com/ja-jp/102445)。クリーンMacでのpkg導入はまだ最終検証前です。
 
-導入先は `/Applications/Audiomeeter.app` と `/Library/Audio/Plug-Ins/HAL/` のAudiomeeter系4バンドルです。既存Audiomeeterは `/Library/Application Support/Audiomeeter/InstallerBackups/` へバックアップします。旧Voicemeeter／BlackHole／他社HALは残ります。失敗時はバックアップから手動復旧が必要な場合があります。
+導入先は `/Applications/Audiomeeter.app` と `/Library/Audio/Plug-Ins/HAL/` のAudiomeeter系4バンドルです。既存Audiomeeterは `/Library/Application Support/Audiomeeter/InstallerBackups/` へバックアップします。BlackHole・他社・旧試作版のHALは残ります。失敗時はバックアップから手動復旧が必要な場合があります。
 
 ## パッケージが使えない場合：ソースから導入
 
@@ -23,7 +23,7 @@ cd Audiomeeter
 open /Applications/Audiomeeter.app
 ```
 
-非公開リポジトリのcloneには所有者または招待されたアカウントの認証が必要です。GitHubの対応ソースtar.gzを展開して、そのディレクトリで後半3コマンドを実行することもできます。tar.gzには固定JUCEソースが含まれ、GitHubの自動生成Source codeアーカイブには含まれません。通常のcloneでは初回ビルド時にJUCEを取得します。
+公開リポジトリは認証なしでcloneできます。GitHubの対応ソースtar.gzを展開して、そのディレクトリで後半3コマンドを実行することもできます。tar.gzには固定JUCEソースが含まれ、GitHubの自動生成Source codeアーカイブには含まれません。通常のcloneでは初回ビルド時にJUCEを取得します。
 
 シェルはソースをビルドして導入するため、開発ツールなしで使えるポータブル版ではありません。本体はアプリ用バックアップを作り、ドライバは管理者認証を要求して4HALだけを置き換えます。ソース導入のバックアップは `.build/installation-backup/` にあります。アプリ更新時は同じ署名IDの利用を推奨します。ad-hoc署名やID変更時にはOS許可を取り直す場合があります。
 

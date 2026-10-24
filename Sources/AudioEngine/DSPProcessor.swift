@@ -391,7 +391,7 @@ public final class DynamicsProcessor {
     }
 }
 
-/// Strip DSP (Fader, EQ, Intellipan, Dynamics, Karaoke)
+/// Strip DSP (Fader, EQ, color pad, Dynamics, Karaoke)
 public final class StripDSP {
     private var currentGainLinear: Float = 1.0
     private var targetGainLinear: Float = 1.0
@@ -423,11 +423,11 @@ public final class StripDSP {
         gainDB: Float,
         isMuted: Bool,
         dynamicsConfig: DynamicsConfig,
-        intellipan: IntellipanState,
+        colorPad: PadState,
         eq: EQ3Band,
         isVirtual: Bool,
         isKaraoke: Bool = false,
-        padMode: InputPadMode = .intellipan, padState: IntellipanState = IntellipanState(), pitchSmooth: Bool = false
+        padMode: InputPadMode = .colorPan, padState: PadState = PadState(), pitchSmooth: Bool = false
     ) {
         if isMuted || gainDB <= -59.5 {
             targetGainLinear = 0.0
@@ -467,11 +467,11 @@ public final class StripDSP {
         }
 
         if !isVirtual { padDSP.process(buffer: buffer, frames: frames, rate: sampleRate, mode: padMode,
-                                      state: padMode == .intellipan ? intellipan : padState, smooth: pitchSmooth) }
+                                      state: padMode == .colorPan ? colorPad : padState, smooth: pitchSmooth) }
         // Only the hardware color PAD uses its horizontal coordinate as balance.
         // Virtual strips pan with StripSettings.pan in the mixer; a legacy
-        // intellipan.x there would otherwise be a hidden second balance stage.
-        let pan = max(-1.0, min(1.0, (!isVirtual && padMode == .intellipan) ? intellipan.x : 0))
+        // colorPad.x there would otherwise be a hidden second balance stage.
+        let pan = max(-1.0, min(1.0, (!isVirtual && padMode == .colorPan) ? colorPad.x : 0))
         let panL = cosf(max(0, pan) * Float.pi / 2.0)
         let panR = cosf(max(0, -pan) * Float.pi / 2.0)
 

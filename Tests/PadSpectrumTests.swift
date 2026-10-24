@@ -44,11 +44,11 @@ import Foundation
             for rate:Float in [44100,48000,192000] {
                 let dsp = InputPadDSP()
                 var block = [Float](repeating:0.1,count:1024)
-                block.withUnsafeMutableBufferPointer { dsp.process(buffer:$0.baseAddress!,frames:512,rate:rate,mode:mode,state:IntellipanState(),smooth:false) }
-                if [.pan,.intellipan,.formant,.modulation].contains(mode) { precondition(block.allSatisfy { abs($0-0.1)<0.00001 }, "Neutral PAD must be transparent") }
+                block.withUnsafeMutableBufferPointer { dsp.process(buffer:$0.baseAddress!,frames:512,rate:rate,mode:mode,state:PadState(),smooth:false) }
+                if [.pan,.colorPan,.formant,.modulation].contains(mode) { precondition(block.allSatisfy { abs($0-0.1)<0.00001 }, "Neutral PAD must be transparent") }
                 for step in 0..<200 {
                     block = (0..<1024).map { sinf(Float($0+step*1024)*0.11)*0.2 }
-                    block.withUnsafeMutableBufferPointer { dsp.process(buffer:$0.baseAddress!,frames:512,rate:rate,mode:mode,state:IntellipanState(x:step%2 == 0 ? -1:1,y:1),smooth:step%3 == 0) }
+                    block.withUnsafeMutableBufferPointer { dsp.process(buffer:$0.baseAddress!,frames:512,rate:rate,mode:mode,state:PadState(x:step%2 == 0 ? -1:1,y:1),smooth:step%3 == 0) }
                     precondition(block.allSatisfy { $0.isFinite && abs($0)<10 })
                 }
             }
@@ -57,7 +57,7 @@ import Foundation
             let dsp = InputPadDSP();var output=[Float]()
             for block in 0..<150 {
                 var samples=(0..<1024).map { i in sinf(2*Float.pi*500*Float(block*512+i/2)/48000)*0.2 }
-                samples.withUnsafeMutableBufferPointer { dsp.process(buffer:$0.baseAddress!,frames:512,rate:48000,mode:.pitch,state:IntellipanState(x:x),smooth:false) }
+                samples.withUnsafeMutableBufferPointer { dsp.process(buffer:$0.baseAddress!,frames:512,rate:48000,mode:.pitch,state:PadState(x:x),smooth:false) }
                 if block>40 { output.append(contentsOf:stride(from:0,to:1024,by:2).map { samples[$0] }) }
             }
             let crossings=(1..<output.count).filter { output[$0-1]<=0 && output[$0]>0 }.count

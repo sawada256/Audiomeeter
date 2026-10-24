@@ -56,6 +56,16 @@ import Foundation
         precondition(decoded.buttons == [button] && decoded.scenes == [scene])
         let legacy = try JSONDecoder().decode(RoutingMatrix.self, from: Data(#"{"a1":true,"a2":false,"a3":false,"b1":true,"b2":false}"#.utf8))
         precondition(legacy == RoutingMatrix(a1: true, b1: true) && legacy[.A5] == false)
+        // Settings saved before the color pad rename still load (key and mode value).
+        var old = try JSONSerialization.jsonObject(with: JSONEncoder().encode(StripSettings())) as! [String: Any]
+        let pad = old.removeValue(forKey: "intellipan")
+        precondition(pad != nil, "The color pad keeps its original settings key")
+        old["intellipan"] = ["x": 0.25, "y": -0.5]; old["padMode"] = "INTELLIPAN"
+        let migrated = try JSONDecoder().decode(StripSettings.self, from: JSONSerialization.data(withJSONObject: old))
+        precondition(migrated.padMode == .colorPan && migrated.colorPad == PadState(x: 0.25, y: -0.5))
+        let renamed = try JSONDecoder().decode(InputPadMode.self, from: Data(#""COLOR PAN""#.utf8))
+        precondition(renamed == .colorPan)
+        precondition(DedicatedDevice.returnBus("AudiomeeterB2_UID") == .B2 && DedicatedDevice.returnBus(nil) == nil)
         print("Macro scripts passed: parsing, errors, value helpers, scoped scene merge, library and legacy routing decode")
     }
 }

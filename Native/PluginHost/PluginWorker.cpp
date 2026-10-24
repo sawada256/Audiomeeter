@@ -59,7 +59,7 @@ class PluginWorker final : public JUCEApplication, private Timer {
     }
 public:
     const String getApplicationName() override { return "Audiomeeter Plugin"; }
-    const String getApplicationVersion() override { return "1.0.0"; }
+    const String getApplicationVersion() override { return "1.1.0"; }
     bool moreThanOneInstanceAllowed() override { return true; }
     void initialise(const String& arguments) override {
         StringArray args; args.addTokens(arguments,true); args.trim();

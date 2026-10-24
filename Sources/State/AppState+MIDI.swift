@@ -145,14 +145,14 @@ extension AppState {
         return nil
     }
     /// The PAD state the hardware strip currently shows (same selection as InputPadView).
-    private func padState(_ strip: StripID) -> IntellipanState {
-        guard let settings = strips[strip] else { return IntellipanState() }
-        switch settings.padMode ?? .intellipan {
-        case .intellipan: return settings.intellipan
-        case .pan: return IntellipanState(x: settings.pan ?? 0)
-        case .modulation: return settings.padModulation ?? IntellipanState()
-        case .pitch: return settings.padPitch ?? IntellipanState()
-        case .formant: return settings.padFormant ?? IntellipanState()
+    private func padState(_ strip: StripID) -> PadState {
+        guard let settings = strips[strip] else { return PadState() }
+        switch settings.padMode ?? .colorPan {
+        case .colorPan: return settings.colorPad
+        case .pan: return PadState(x: settings.pan ?? 0)
+        case .modulation: return settings.padModulation ?? PadState()
+        case .pitch: return settings.padPitch ?? PadState()
+        case .formant: return settings.padFormant ?? PadState()
         }
     }
 

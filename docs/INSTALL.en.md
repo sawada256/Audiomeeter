@@ -8,7 +8,7 @@ Apple Silicon, macOS 14+. Packages require no build tools. Quit Audiomeeter and 
 
 Current `LOCAL-UNSIGNED` artifacts have no installer signature or notarization. If blocked, verify their trusted origin/hash, then use Open Anyway in System Settings → Privacy & Security when available. OS versions and managed-device policies may prevent overrides. Stop on malware/damage warnings. Do not disable Gatekeeper globally. See [Apple's instructions](https://support.apple.com/en-us/102445). Clean-machine package installation still needs final testing.
 
-Targets are `/Applications/Audiomeeter.app` and four Audiomeeter bundles in `/Library/Audio/Plug-Ins/HAL/`. Existing Audiomeeter files are backed up in `/Library/Application Support/Audiomeeter/InstallerBackups/`. Legacy Voicemeeter, BlackHole and other HALs remain intact. Failure recovery may require manual backup restoration.
+Targets are `/Applications/Audiomeeter.app` and four Audiomeeter bundles in `/Library/Audio/Plug-Ins/HAL/`. Existing Audiomeeter files are backed up in `/Library/Application Support/Audiomeeter/InstallerBackups/`. BlackHole, other vendors' and earlier prototype HALs remain intact. Failure recovery may require manual backup restoration.
 
 ## Source-install fallback
 
@@ -23,7 +23,7 @@ cd Audiomeeter
 open /Applications/Audiomeeter.app
 ```
 
-Cloning the private repository requires its owner or an invited account. Alternatively extract the corresponding-source tar.gz and run the final three commands there. Our source tar.gz includes pinned JUCE; GitHub's automatic Source code archives do not. A normal clone downloads JUCE on its first build.
+The public repository can be cloned without authentication. Alternatively extract the corresponding-source tar.gz and run the final three commands there. Our source tar.gz includes pinned JUCE; GitHub's automatic Source code archives do not. A normal clone downloads JUCE on its first build.
 
 These scripts build from source, not a portable installation without developer tools. The app installer creates a backup. The driver installer requests administrator rights and replaces only four Audiomeeter HALs. Source-install backups live in `.build/installation-backup/`. Use a consistent signing identity for updates; ad-hoc signing or identity changes can require renewed permissions.
 

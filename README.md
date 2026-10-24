@@ -2,23 +2,131 @@
 
 # Audiomeeter
 
-Apple Silicon / macOS 14以降向けステレオミキサー。非公開開発版で、未公証のテスト用インストーラーを用意しています。VB-Audioとは独立した実装で、公式製品ではありません。
+Apple Silicon / macOS 14以降向けの、ルーティング自由度の高いステレオ仮想オーディオミキサーです。マイク・オーディオインターフェース・PC音声・通話アプリの音を、スピーカー／ヘッドホン／配信・通話アプリへ自由に振り分け、音量・EQ・ダイナミクス・VST3エフェクトで整えられます。
 
-[導入](docs/INSTALL.ja.md) · [使い方](docs/USAGE.ja.md) · [本家との違い](docs/COMPARISON.ja.md) · [EQ・PAD](docs/PADS_SPECTRUM.ja.md) · [出力バス](docs/OUTPUT_BUS.ja.md) · [Release](docs/DISTRIBUTION.ja.md) · [ライセンス](docs/LICENSING.ja.md) · [既知の課題](docs/AUDIT.ja.md) · [設計レビュー](docs/REVIEW_2026-10.ja.md) · [開発](docs/DEVELOPMENT.ja.md)
+> **本家との関係について**
+> Audiomeeterは、Windows向けの仮想ミキサー [Voicemeeter](https://vb-audio.com/Voicemeeter/)（VB-Audio Software）の操作感を参考に、macOS向けに独自に実装したソフトウェアです。VB-Audioとは無関係で、公式製品・公認製品ではなく、設定ファイル・ドライバー・音質の互換性もありません。Voicemeeterのコード・画像・ロゴは使用していません。
+> 名称・外観・その他の点で権利者や関係者から問題の指摘があった場合は、速やかにこのリポジトリを非公開にし、修正または公開停止で対応します。ご連絡は [Issues](https://github.com/sawada256/Audiomeeter/issues) へお願いします。
 
-## 機能
+[導入](docs/INSTALL.ja.md) · [使い方](docs/USAGE.ja.md) · [本家との違い](docs/COMPARISON.ja.md) · [EQ・PAD](docs/PADS_SPECTRUM.ja.md) · [出力バス](docs/OUTPUT_BUS.ja.md) · [配布物](docs/DISTRIBUTION.ja.md) · [ライセンス](docs/LICENSING.ja.md) · [既知の課題](docs/AUDIT.ja.md) · [設計レビュー](docs/REVIEW_2026-10.ja.md) · [開発](docs/DEVELOPMENT.ja.md)
 
-- 物理3〜5＋VAIO/AUX入力、A1–A3〜A5/B1/B2、左右チャンネル指定、PAN/EQ/ダイナミクス。
-- ARM64 VST3のPRE/POSTインサート、別プロセス処理、サイドチェインと遅延補正。
-- 専用HALによるVAIO/B1・AUX/B2の全二重とアプリ別trim。
-- EQプリセット・重ね表示スペアナ、切替式入力PAD（試験Formantを含む）。
-- MIDIコントローラー割り当て（MIDI Learn、相対エンコーダー、ピックアップ、VST3パラメーター）。
-- マクロボタン・シーン保存、ルーティングマトリクス、診断画面。
-- 録音・再生、ホットキー、常駐ミニミキサー、自動復帰・ログイン時起動。
-- 日本語（既定）／英語切替。OS・第三者エディターの言語は提供元に従います。
+## ダウンロード
 
-## 導入とライセンス
+[Releases](https://github.com/sawada256/Audiomeeter/releases) から次の2つのインストーラーを入手します。
 
-本体・ドライバの2つのpkgを使います。未公証版はmacOSの許可操作が必要になる場合があります。ビルド用シェルによる代替導入手順もあります。[導入手順](docs/INSTALL.ja.md)を確認してください。VST2/AU、Intel専用プラグイン、サラウンドには対応していません。
+| ファイル | 内容 |
+|---|---|
+| `Audiomeeter-App-*.pkg` | 本体（`/Applications/Audiomeeter.app`）とVST3ホスト |
+| `Audiomeeter-Drivers-*.pkg` | 専用仮想デバイス **Audiomeeter VAIO / AUX / B1 / B2**（Core Audio HALドライバー） |
+| `Audiomeeter-Source-*.tar.gz` | そのバイナリに対応するソース一式（ライセンス上の対応ソース） |
 
-アプリ／ホスト／配布ツールはAGPL-3.0-only、独立HALはGPL-3.0-only。依存素材には各条件が適用されます。[LICENSE](LICENSE.md)・[第三者通知](THIRD_PARTY_NOTICES.ja.md)を参照してください。Releaseへはバイナリだけでなく対応ソースも添付します。署名・公証・実機検証など[一般公開前の課題](docs/AUDIT.ja.md)が残っています。
+本体 → ドライバーの順に開いて導入します。現在の配布物は**パッケージ署名・Appleの公証を行っていない試験版**です。macOSにブロックされた場合の扱いと、ソースからの導入方法は[導入手順](docs/INSTALL.ja.md)を参照してください。
+
+## 画面構成
+
+```
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│ AUDIOMEETER   Mac出力: [▾] [→VAIO]   ENGINE LIVE  48000 Hz  256 samples    Menu ▾ │
+├───────────────────────────────────────────────────────────────────────────────────┤
+│ 録音・再生デッキ  REC / PLAY / PAUSE / STOP / LOOP   SRC / FMT   PLAY TO [A1..B2]  │
+├──────────┬──────────┬──────────┬──────────┬──────────┬────────────────────────────┤
+│ HARDWARE │ HARDWARE │ HARDWARE │   VAIO   │   AUX    │ MASTER SECTION             │
+│ INPUT 1  │ INPUT 2  │ INPUT 3  │ (PC音声) │ (通話等) │  A1  A2  A3   B1  B2       │
+│ PAD      │ PAD      │ PAD      │ EQ 3band │ EQ 3band │  機器名 / Mac音量バー        │
+│ COMP/GATE│ COMP/GATE│ COMP/GATE│ KARAOKE  │ KARAOKE  │  MODE / Mute / INSERT      │
+│ INSERTS  │ INSERTS  │ INSERTS  │ APPS     │ APPS     │  EQ(6band) / LIMIT         │
+│ [A1..A3] │ [A1..A3] │ [A1..A3] │ INSERTS  │ INSERTS  │                            │
+│ [B1][B2] │ [B1][B2] │ [B1][B2] │ PAN      │ PAN      │                            │
+│ Mute/Solo│ Mute/Solo│ Mute/Solo│ Mute/Solo│ Mute/Solo│                            │
+│ Fader/VU │ Fader/VU │ Fader/VU │ Fader/VU │ Fader/VU │  Fader / VU                │
+└──────────┴──────────┴──────────┴──────────┴──────────┴────────────────────────────┘
+```
+
+ハードウェア入力は3〜5本、物理出力はA1–A3〜A1–A5に切り替えられます（オーディオ設定 → エンジン）。
+
+## 主な機能
+
+### ミキサーとルーティング
+- **入力**: 物理入力3〜5本（マイク・オーディオインターフェース等）と、仮想入力2本（**VAIO** = Macのシステム音声、**AUX** = 通話アプリ等）。
+- **出力**: 物理出力A1〜A5（スピーカー・ヘッドホン等）と、仮想出力B1/B2（配信・通話・録音アプリへ送るミックス）。**A1がマスタークロック**です。
+- 各入力の `A1〜A5` `B1` `B2` ボタンで、任意の入力を任意の出力へ送れます。全体を一覧で切り替える**ルーティングマトリクス**ウィンドウもあります。
+- 入力ごとに左右チャンネルを個別指定（同じチャンネルを選ぶとモノラル）。出力も同様。
+- 独立したクロックの機器間は、適応型のクロック補正とサンプルレート変換で同期します。A1と同じ機器の入力・別チャンネル出力は、補正なしでA1と同じ処理内で直接読み書きします。
+- デバイスの抜き差し・音声停止を検知して自動で再接続します。
+
+### 入力ストリップ
+- **物理入力**: PAD（COLOR PAN〔明暗＋左右〕／PAN／MODULATION／PITCH／FORMANT〔試験的〕）、COMP、GATE。
+- **仮想入力**: 3バンドEQ（BASS/MED/TREBLE、3つのプリセット）、KARAOKE（中央の声を抑える）、PAN、アプリ別音量（APPS）。
+- 全入力: ゲイン（−60〜+12 dB、ダブルクリックで0 dB）、Mute/Solo、PRE/POSTのVST3インサート、ピーク・RMSメーター。
+
+### 出力バス
+- モード（Normal / Mix Down / Mono）、Mute、ゲイン、追加ディレイ（機器ごとの遅延調整）。
+- **6バンド パラメトリックEQ**（プリセット3つ、スペクトラムアナライザー重ね表示）。
+- **リミッター**（Threshold / Ceiling、先読み0〜20 ms）。
+- 信号順序（EQをINSERTの前・後、LIMITの前・後に置く）を選択。
+- バス見出しの下に、割り当てた機器の**Macの出力音量バー**とミュート（Macの音量は最後に掛かるため、ここで確認・調整できます）。
+
+### VST3エフェクト
+- ARM64のVST3エフェクトを、入力・出力バスのPRE/POSTへ挿入。プラグインは**1つずつ別プロセス**で動き、落ちたり処理が間に合わなかったりしてもミキサーは止まりません（遅延を保った原音に切り替え、既定で自動再起動）。
+- 挿入・削除・並べ替え・サイドチェイン変更は音声を止めずに反映。
+- **遅延補正（PDC）**: 同じバスに混ぜる経路、出力バス同士、サイドチェインと本線の時刻を揃えます（個別にON/OFF）。
+- **サイドチェイン**: 任意の入力・出力バスを指定（循環接続は1ブロック前の信号を使用）。
+- **バイパス2種**: 簡易（遅延を維持、グレー表示）／完全（経路から外す、黒表示）。⌥クリックでもう一方。
+- プラグインへの**MIDI入力**、プラグインのパラメーターをMIDIコントローラーで操作。
+
+### 専用仮想デバイス（ドライバーpkg）
+- **Audiomeeter VAIO / AUX**: アプリの再生先。VAIO/AUX入力に入ります。
+- **Audiomeeter B1 / B2**: B1/B2バスの音を録音・配信・通話アプリへ渡す入力デバイス。
+- DAW向けの全二重: DAWでAudiomeeter VAIOを選ぶと、再生はVAIOへ、録音はB1から（AUXはB2と対）。
+- **アプリ別音量**: VAIO/AUXに出力しているアプリごとに音量を調整・記憶。
+
+### 操作・自動化
+- **Mac出力の切り替え**: 上部メニューでアプリの出力先（コントロールセンターと同じ設定）を選択。「→VAIO」でワンタップ切り替え、もう一度押すと元に戻ります。
+- **MIDIコントローラー**: MIDI Learn（フェーダーの右クリックからも可）、CC・ノート・ピッチベンド（14bitフェーダー）、相対エンコーダー2方式、ピックアップ（値の飛び防止）、ボタンのトグル／追従。
+- **マクロボタン**: スクリプトで複数の操作をまとめて実行（例: `Strip[0].A1 = 1; Bus[1].Gain -= 3; Scene = "配信"`）。押す／トグル／押している間、ラジオボタン式のグループ、キー・MIDI割り当て。
+- **シーン**: ルーティング・音量・Mute/Solo・EQ・ダイナミクス・INSERT状態をまとめて保存・呼び出し（呼び出す範囲を選択可能、JSONで書き出し／読み込み）。
+- **ホットキー**・Macの**音量キー**でフェーダー操作、常駐**ミニミキサー**（フェーダー・メーター・アプリ別音量）。
+- **診断**ウィンドウ: 処理負荷、締切超過、各経路の方式・バッファ状態・クロック補正量・遅延、プラグインごとの処理時間・再起動回数、録音の欠落。
+
+### 録音・再生
+- 任意のバス・入力を WAV（16/24/32bit float）または AAC（128〜320 kbps）で録音。
+- 音声ファイルを任意のバスへ再生（ループ・シーク、ストリーミング再生）。
+
+### その他
+- 日本語（既定）／英語の切り替え。設定は自動保存。ログイン時の自動起動。
+
+## 使い方の例：配信・通話でマイクとPC音声を混ぜる
+
+1. **A1** にヘッドホンやスピーカー（またはオーディオインターフェース）を選びます。
+2. **HARDWARE INPUT 1** にマイクを選び、`B1` をON（相手に声を送る）。自分の声を聞きたい場合は `A1` もON。
+3. **VAIO** 入力に **Audiomeeter VAIO** を選び、`A1`（自分で聞く）と `B1`（配信に流す）をON。
+4. 上部の「Mac出力」で **Audiomeeter VAIO** を選ぶ（または「→VAIO」）。ブラウザやゲームの音がVAIOに入ります。
+5. 通話アプリの出力を **Audiomeeter AUX** にし、AUX入力は `A1` のみON（相手の声を配信・通話へ戻さないため `B1` はOFF）。
+6. 通話アプリ・OBSのマイク（入力）に **Audiomeeter B1** を選びます。
+
+DAWとの組み合わせは[使い方](docs/USAGE.ja.md)を参照してください。
+
+## 動作環境と制限
+
+- Apple Silicon Mac、macOS 14以降。処理はステレオ（32bit float）。
+- 対応プラグインはARM64のVST3エフェクトのみ（VST2・AU・Intel専用・インストゥルメントは非対応）。
+- 配布物は未署名・未公証の試験版です。一般配布向けの署名・公証、各macOS版での網羅的な実機検証は未完了です（[既知の課題](docs/AUDIT.ja.md)）。
+- 本家Voicemeeterの全機能（VBAN、サラウンド等）や設定との互換はありません（[本家との違い](docs/COMPARISON.ja.md)）。
+
+## ソースからのビルド
+
+```sh
+xcode-select --install
+git clone https://github.com/sawada256/Audiomeeter.git
+cd Audiomeeter
+./install_app.sh        # 本体をビルドして /Applications へ導入
+./install_drivers.sh    # 専用デバイスをビルドして導入（管理者認証）
+```
+
+CMake 3.22以降とPython 3が必要です。JUCEは固定コミットを自動取得します。テストは `./Tests/run_audio_tests.sh`。詳しくは[開発](docs/DEVELOPMENT.ja.md)。
+
+## ライセンス
+
+アプリ・VST3ホスト・配布ツールは **AGPL-3.0-only**、専用HALドライバー（[BlackHole](https://github.com/ExistentialAudio/BlackHole)の改変版）は **GPL-3.0-only** です。JUCE・VST3 SDK等の依存物は各ライセンスに従います。[LICENSE](LICENSE.md)・[第三者通知](THIRD_PARTY_NOTICES.ja.md)を参照してください。
+
+Voicemeeter は VB-Audio Software の商標です。その他の製品名は各社の商標です。

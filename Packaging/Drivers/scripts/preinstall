@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 [ "${3:-/}" = / ] || { echo 'Install on the running system volume only.' >&2; exit 1; }
-if pgrep -x Audiomeeter >/dev/null || pgrep -x VoicemeeterMac >/dev/null; then
-    echo 'Quit Audiomeeter/Voicemeeter and audio apps before installing. / 音声アプリを終了してください。' >&2
+if pgrep -x Audiomeeter >/dev/null; then
+    echo 'Quit Audiomeeter and audio apps before installing. / Audiomeeterと音声アプリを終了してください。' >&2
     exit 1
 fi
 TASK_HAL=/Library/Audio/Plug-Ins/HAL

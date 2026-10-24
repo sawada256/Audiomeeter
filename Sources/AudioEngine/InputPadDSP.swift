@@ -7,7 +7,7 @@ final class InputPadDSP {
     private var cursor = 0
     private var phase: Float = 0
     private var lastMode: InputPadMode?
-    private var lastState = IntellipanState(x: 99, y: 99)
+    private var lastState = PadState(x: 99, y: 99)
     private var lastRate: Float = 0
     private var lastSmooth = false
     static func latencyFrames(mode: InputPadMode, smooth: Bool, rate: Float) -> Int {
@@ -25,14 +25,14 @@ final class InputPadDSP {
         let fraction = position - floorPosition
         return history[index * 2 + channel] * (1-fraction) + history[((index+1) & 32767)*2+channel] * fraction
     }
-    func process(buffer: UnsafeMutablePointer<Float>, frames: Int, rate: Float, mode: InputPadMode, state: IntellipanState, smooth: Bool) {
+    func process(buffer: UnsafeMutablePointer<Float>, frames: Int, rate: Float, mode: InputPadMode, state: PadState, smooth: Bool) {
         let x = max(-1,min(1,state.x)), y = max(-1,min(1,state.y))
         if lastMode != mode || lastRate != rate || lastSmooth != smooth {
-            reset(); lastMode = mode; lastRate = rate; lastSmooth = smooth; lastState = IntellipanState(x:99,y:99)
+            reset(); lastMode = mode; lastRate = rate; lastSmooth = smooth; lastState = PadState(x:99,y:99)
         }
         if lastState != state {
             lastState = state
-            if mode == .intellipan {
+            if mode == .colorPan {
                 filters[0].setLowShelf(sampleRate:rate,cutoffHz:300,gainDB:-6*y)
                 filters[1].setHighShelf(sampleRate:rate,cutoffHz:min(3000,rate*0.3),gainDB:6*y)
             } else if mode == .formant {
@@ -47,8 +47,8 @@ final class InputPadDSP {
             }
         }
         if mode == .pan { return }
-        if mode == .intellipan || mode == .formant {
-            let count = mode == .intellipan ? 2 : 6
+        if mode == .colorPan || mode == .formant {
+            let count = mode == .colorPan ? 2 : 6
             for frame in 0..<frames {
                 var l = buffer[frame*2], r = buffer[frame*2+1]
                 for i in 0..<count { (l,r) = filters[i].process(left:l,right:r) }

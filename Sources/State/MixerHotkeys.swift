@@ -119,7 +119,7 @@ import CoreAudio
     private var ids: [AudioObjectID] = []
     private var timer: Timer?
     func configure(enabled: Bool, devices: [AudioDeviceInfo]) {
-        let next = enabled ? devices.filter { ["Audiomeeter_UID", "AudiomeeterAUX_UID", "Voicemeeter_UID", "VoicemeeterAUX_UID"].contains($0.uid) }.map(\.id) : []
+        let next = enabled ? devices.filter { DedicatedDevice.vaio.union(DedicatedDevice.aux).contains($0.uid) }.map(\.id) : []
         guard next != ids else { return }
         stop(); ids = next
         for id in next {

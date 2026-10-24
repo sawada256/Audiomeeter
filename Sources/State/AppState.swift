@@ -45,7 +45,7 @@ public final class AppState: ObservableObject {
 
     public let recorderPlayer = AudioRecorderPlayer()
 
-    // Per-Application Volume Lists (Potato feature)
+    // Per-application volume lists (dedicated VAIO/AUX drivers)
     @Published public var vaioAppVolumes: [AppVolumeItem] = []
     @Published public var auxAppVolumes: [AppVolumeItem] = []
 
@@ -134,7 +134,7 @@ public final class AppState: ObservableObject {
     func setDefaultBypassMode(_ mode: InsertBypassMode) { defaultBypassMode = mode; saveSettings() }
     func setAutomaticPluginRestart(_ enabled: Bool) { automaticPluginRestart = enabled; saveSettings() }
 
-    // Configurable layout (Banana-like 3+3 up to Potato-like 5+5 physical strips/buses).
+    // Configurable layout: 3 to 5 physical input strips and A buses.
     @Published var hardwareInputCount = 3
     @Published var physicalBusCount = 3
     var visibleStrips: [StripID] { StripID.allCases.filter { $0.hardwareIndex.map { $0 < hardwareInputCount } ?? true } }
@@ -316,28 +316,28 @@ public final class AppState: ObservableObject {
 
     private func autoAssignVirtualDevices() {
         // 1. Virtual Input 1 (VAIO): Audiomeeter VAIO, Audiomeeter, or BlackHole 2ch
-        if let vaio = inputDevices.first(where: { $0.name == "Voicemeeter" || $0.name == "Voicemeeter VAIO" || $0.name == "Audiomeeter" || $0.name == "Audiomeeter VAIO" || $0.name == "BlackHole 2ch" }) {
+        if let vaio = inputDevices.first(where: { DedicatedDevice.vaio.contains($0.uid) || DedicatedDevice.vaioNames.contains($0.name) || $0.name == "BlackHole 2ch" }) {
             if strips[.virtualVAIO]?.deviceUID == nil {
                 setStripDevice(strip: .virtualVAIO, device: vaio)
             }
         }
 
         // 2. Virtual Input 2 (AUX): Audiomeeter AUX or BlackHole 16ch
-        if let aux = inputDevices.first(where: { $0.name == "Voicemeeter AUX" || $0.name == "Audiomeeter AUX" || $0.name.contains("BlackHole 16ch") }) {
+        if let aux = inputDevices.first(where: { DedicatedDevice.aux.contains($0.uid) || DedicatedDevice.auxNames.contains($0.name) || $0.name.contains("BlackHole 16ch") }) {
             if strips[.virtualAUX]?.deviceUID == nil {
                 setStripDevice(strip: .virtualAUX, device: aux)
             }
         }
 
         // 3. Virtual Output B1 (VAIO Out): Audiomeeter B1 ONLY (never assign to Audiomeeter playback!)
-        if let outB1 = outputDevices.first(where: { ["AudiomeeterB1_UID", "VoicemeeterB1_UID"].contains($0.uid) }) {
+        if let outB1 = outputDevices.first(where: { DedicatedDevice.b1.contains($0.uid) }) {
             if buses[.B1]?.deviceUID == nil {
                 setBusDevice(bus: .B1, device: outB1)
             }
         }
 
         // 4. Virtual Output B2 (AUX Out): Audiomeeter B2 ONLY (never assign to Audiomeeter AUX playback!)
-        if let outB2 = outputDevices.first(where: { ["AudiomeeterB2_UID", "VoicemeeterB2_UID"].contains($0.uid) }) {
+        if let outB2 = outputDevices.first(where: { DedicatedDevice.b2.contains($0.uid) }) {
             if buses[.B2]?.deviceUID == nil {
                 setBusDevice(bus: .B2, device: outB2)
             }
@@ -473,13 +473,13 @@ public final class AppState: ObservableObject {
         saveSettings()
     }
 
-    func setInputPad(strip: StripID, mode: InputPadMode? = nil, state: IntellipanState? = nil, smooth: Bool? = nil) {
+    func setInputPad(strip: StripID, mode: InputPadMode? = nil, state: PadState? = nil, smooth: Bool? = nil) {
         guard var s = strips[strip] else { return }
         if let mode { s.padMode = mode }
         if let smooth { s.pitchSmooth = smooth }
         if let state {
-            switch s.padMode ?? .intellipan {
-            case .intellipan: s.intellipan = state
+            switch s.padMode ?? .colorPan {
+            case .colorPan: s.colorPad = state
             case .pan: s.pan = state.x
             case .modulation: s.padModulation = state
             case .pitch: s.padPitch = state
@@ -492,8 +492,8 @@ public final class AppState: ObservableObject {
     }
 
     public func setStripIntellipan(strip: StripID, x: Float, y: Float) {
-        strips[strip]?.intellipan = IntellipanState(x: x, y: y)
-        engine.updateStripSettings(strip: strip) { $0.intellipan = IntellipanState(x: x, y: y) }
+        strips[strip]?.colorPad = PadState(x: x, y: y)
+        engine.updateStripSettings(strip: strip) { $0.colorPad = PadState(x: x, y: y) }
         saveSettings()
     }
 
@@ -1064,11 +1064,11 @@ extension AppState {
 
     /// Output devices the Mac can play to (Audiomeeter's mixer-only B1/B2 returns excluded).
     var systemOutputChoices: [AudioDeviceInfo] {
-        outputDevices.filter { !["AudiomeeterB1_UID", "AudiomeeterB2_UID", "VoicemeeterB1_UID", "VoicemeeterB2_UID"].contains($0.uid) }
+        outputDevices.filter { !DedicatedDevice.returns.contains($0.uid) }
     }
     private var vaioPlaybackDevice: AudioDeviceInfo? {
         outputDevices.first { $0.uid == strips[.virtualVAIO]?.deviceUID }
-            ?? outputDevices.first { ["Audiomeeter_UID", "Voicemeeter_UID"].contains($0.uid) }
+            ?? outputDevices.first { DedicatedDevice.vaio.contains($0.uid) }
     }
     var systemOutputIsVAIO: Bool { systemOutputDeviceID != nil && systemOutputDeviceID == vaioPlaybackDevice?.id }
 
@@ -1083,7 +1083,7 @@ extension AppState {
     /// One tap: Mac output -> Audiomeeter VAIO, and a second tap returns to the previous device.
     func toggleSystemOutputVAIO() {
         if systemOutputIsVAIO {
-            guard let previous = outputDevices.first(where: { $0.uid == previousSystemOutputUID }) ?? systemOutputChoices.first(where: { $0.id != vaioPlaybackDevice?.id && !$0.uid.hasPrefix("Audiomeeter") && !$0.uid.hasPrefix("Voicemeeter") }) else { return }
+            guard let previous = outputDevices.first(where: { $0.uid == previousSystemOutputUID }) ?? systemOutputChoices.first(where: { $0.id != vaioPlaybackDevice?.id && !DedicatedDevice.vaio.union(DedicatedDevice.aux).contains($0.uid) }) else { return }
             setSystemOutput(previous)
         } else if let vaio = vaioPlaybackDevice {
             setSystemOutput(vaio)
@@ -1107,7 +1107,7 @@ extension AppState {
     private func applyAppVolumes(defaultID: AudioObjectID?, values: [StripID: Result<[VMAppClient], Error>], requested: [StripID: (AudioDeviceID, String)]) {
         if let defaultID {
             let uid = deviceManager.findDevice(byID: defaultID)?.uid
-            let selected: StripID? = ["Audiomeeter_UID", "Voicemeeter_UID"].contains(uid) ? .virtualVAIO : ["AudiomeeterAUX_UID", "VoicemeeterAUX_UID"].contains(uid) ? .virtualAUX : nil
+            let selected: StripID? = uid.map(DedicatedDevice.vaio.contains) == true ? .virtualVAIO : uid.map(DedicatedDevice.aux.contains) == true ? .virtualAUX : nil
             if systemOutputStrip != selected { systemOutputStrip = selected }
         }
         for strip in [StripID.virtualVAIO, .virtualAUX] {

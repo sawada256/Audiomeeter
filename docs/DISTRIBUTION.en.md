@@ -2,20 +2,20 @@
 
 # GitHub Release assets
 
-This is currently a **private test repository**. No Release has been created; publishing one or making the repository public is a separate action. Attach all of these together:
+Attach all of these to the same GitHub Release of the public repository; they are unsigned, unnotarized test builds. Attach them together:
 
 | Asset | Purpose |
 |---|---|
-| `Audiomeeter-App-1.0.0-12-arm64-LOCAL-UNSIGNED.pkg` | App, plugin host and notices |
-| `Audiomeeter-Drivers-1.0.0-12-arm64-LOCAL-UNSIGNED.pkg` | Four VAIO/AUX/B1/B2 HALs |
-| `Audiomeeter-Source-1.0.0-12.tar.gz` | Matching source, modified HAL, pinned JUCE, install scripts/docs |
-| `release-manifest-1.0.0-12-arm64-LOCAL-UNSIGNED.json` | Source revision and SHA-256 hashes |
+| `Audiomeeter-App-1.1.0-13-arm64-LOCAL-UNSIGNED.pkg` | App, plugin host and notices |
+| `Audiomeeter-Drivers-1.1.0-13-arm64-LOCAL-UNSIGNED.pkg` | Four VAIO/AUX/B1/B2 HALs |
+| `Audiomeeter-Source-1.1.0-13.tar.gz` | Matching source, modified HAL, pinned JUCE, install scripts/docs |
+| `release-manifest-1.1.0-13-arm64-LOCAL-UNSIGNED.json` | Source revision and SHA-256 hashes |
 
-Do not substitute GitHub's automatic Source code archives for the corresponding-source artifact. Binary recipients need access to matching source. Private Releases are accessible only to authorized repository users.
+Do not substitute GitHub's automatic Source code archives for the corresponding-source artifact. Binary recipients need access to matching source. If the repository is ever made private, corresponding source is still provided separately to people who already received binaries.
 
 ## Release body template
 
-> Audiomeeter 1.0.0 build 12 — private test / 非公開試験版
+> Audiomeeter 1.1.0 build 13 — test build / 試験版
 > Apple Silicon / macOS 14+ only. Not notarized; installer packages unsigned. / 未公証・パッケージ署名なし。
 > Install App, then Drivers if virtual routing is needed. Quit audio apps first; driver installation restarts Core Audio. / 本体→必要ならドライバの順。事前に音声アプリを終了。
 > See Installation / User guide / Known issues in both languages. Corresponding source and SHA-256 manifest are attached. / 日英導入・操作・既知の課題を参照。対応ソースとハッシュ同梱。

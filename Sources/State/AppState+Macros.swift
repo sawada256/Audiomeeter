@@ -183,13 +183,13 @@ extension AppState {
         case .eqgain2: if let value = number(settings.eq.midGainDB, -12...12) { setStripEQ(strip: strip, mid: value) }
         case .eqgain3: if let value = number(settings.eq.highGainDB, -12...12) { setStripEQ(strip: strip, high: value) }
         case .padx, .pady:
-            var state: IntellipanState
-            switch settings.padMode ?? .intellipan {
-            case .intellipan: state = settings.intellipan
-            case .pan: state = IntellipanState(x: settings.pan ?? 0)
-            case .modulation: state = settings.padModulation ?? IntellipanState()
-            case .pitch: state = settings.padPitch ?? IntellipanState()
-            case .formant: state = settings.padFormant ?? IntellipanState()
+            var state: PadState
+            switch settings.padMode ?? .colorPan {
+            case .colorPan: state = settings.colorPad
+            case .pan: state = PadState(x: settings.pan ?? 0)
+            case .modulation: state = settings.padModulation ?? PadState()
+            case .pitch: state = settings.padPitch ?? PadState()
+            case .formant: state = settings.padFormant ?? PadState()
             }
             if property == .padx, let value = number(state.x, -1...1) { state.x = value } else if property == .pady, let value = number(state.y, -1...1) { state.y = value }
             setInputPad(strip: strip, state: state)

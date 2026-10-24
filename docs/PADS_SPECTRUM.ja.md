@@ -2,7 +2,7 @@
 
 # 入力PADとEQスペアナ
 
-物理入力のPADはPAN／INTELLIPAN／MODULATION／PITCH／FORMANT (EXP)を切り替えます。選択メニューまたは右クリックで切り替え、同じ領域で編集します。通常PANは中央付近のスナップとダブルクリックの中央復帰に対応します。INTELLIPANのBright/Darkは音色用シェルフで、単純なHPF/LPFではありません。
+物理入力のPADはPAN／COLOR PAN／MODULATION／PITCH／FORMANT (EXP)を切り替えます。選択メニューまたは右クリックで切り替え、同じ領域で編集します。通常PANは中央付近のスナップとダブルクリックの中央復帰に対応します。INTELLIPANのBright/Darkは音色用シェルフで、単純なHPF/LPFではありません。
 
 MODULATIONはコーラス系の変調、PITCHは簡易ピッチ変更です。FORMANTは固定共鳴を動かす試験的な別PADで、厳密な声道推定・ピッチ独立フォルマント変換ではありません。声が変わる効果を試す用途です。商用ボイスチェンジャーと同じ品質を保証しません。
 

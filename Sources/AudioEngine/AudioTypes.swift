@@ -5,7 +5,7 @@ public enum BusID: Int, CaseIterable, Identifiable, Codable {
     case A1 = 0
     case A2 = 1
     case A3 = 2
-    // Optional physical buses (Potato-sized layout). Raw values keep B1/B2 stable in saved settings.
+    // Optional physical buses A4/A5 (5+5 layout). Raw values keep B1/B2 stable in saved settings.
     case A4 = 5
     case A5 = 6
     case B1 = 3
@@ -192,7 +192,7 @@ public struct EQ3Band: Codable, Equatable {
     }
 }
 
-public struct IntellipanState: Codable, Equatable {
+public struct PadState: Codable, Equatable {
     public var x: Float // -1.0 to 1.0 (Color / Pan)
     public var y: Float // -1.0 to 1.0 (Echo / Brightness)
 
@@ -294,7 +294,14 @@ public enum BusMode: String, CaseIterable, Identifiable, Codable {
     public var id: String { rawValue }
 }
 
-public enum InputPadMode: String, Codable, CaseIterable { case intellipan = "INTELLIPAN", pan = "PAN", modulation = "MODULATION", pitch = "PITCH", formant = "FORMANT (EXP)" }
+public enum InputPadMode: String, Codable, CaseIterable {
+    case colorPan = "COLOR PAN", pan = "PAN", modulation = "MODULATION", pitch = "PITCH", formant = "FORMANT (EXP)"
+    /// Settings saved by builds before the rename used "INTELLIPAN" for the color pad.
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = raw == "INTELLIPAN" ? .colorPan : (Self(rawValue: raw) ?? .colorPan)
+    }
+}
 
 public struct StripSettings: Codable, Equatable {
     public var deviceUID: String?
@@ -305,16 +312,22 @@ public struct StripSettings: Codable, Equatable {
     public var isMuted: Bool
     public var isSolo: Bool
     public var routing: RoutingMatrix
-    public var intellipan: IntellipanState
+    public var colorPad: PadState
     public var dynamics: DynamicsConfig
     public var eq: EQ3Band
     public var isKaraoke: Bool        // Vocal / Center Cancel
     public var padMode: InputPadMode? = nil
-    public var padModulation: IntellipanState? = nil
-    public var padPitch: IntellipanState? = nil
-    public var padFormant: IntellipanState? = nil
+    public var padModulation: PadState? = nil
+    public var padPitch: PadState? = nil
+    public var padFormant: PadState? = nil
     public var pitchSmooth: Bool? = nil
     public var pan: Float? = nil // Stereo balance: -1 left, 0 center, +1 right.
+    // "intellipan" is the settings key used before the color pad was renamed.
+    private enum CodingKeys: String, CodingKey {
+        case deviceUID, channelOffset, leftChannel, rightChannel, gainDB, isMuted, isSolo, routing
+        case colorPad = "intellipan"
+        case dynamics, eq, isKaraoke, padMode, padModulation, padPitch, padFormant, pitchSmooth, pan
+    }
 
     public init(
         deviceUID: String? = nil,
@@ -322,7 +335,7 @@ public struct StripSettings: Codable, Equatable {
         isMuted: Bool = false,
         isSolo: Bool = false,
         routing: RoutingMatrix = RoutingMatrix(),
-        intellipan: IntellipanState = IntellipanState(),
+        colorPad: PadState = PadState(),
         dynamics: DynamicsConfig = DynamicsConfig(),
         eq: EQ3Band = EQ3Band(),
         isKaraoke: Bool = false
@@ -332,7 +345,7 @@ public struct StripSettings: Codable, Equatable {
         self.isMuted = isMuted
         self.isSolo = isSolo
         self.routing = routing
-        self.intellipan = intellipan
+        self.colorPad = colorPad
         self.dynamics = dynamics
         self.eq = eq
         self.isKaraoke = isKaraoke
@@ -434,10 +447,28 @@ public struct MeterLevel {
     }
 }
 
+/// UIDs of Audiomeeter's dedicated HAL devices. Each list also accepts the UID of the
+/// developer's earlier prototype driver (before the project was renamed Audiomeeter),
+/// so existing installations keep working; new installers only create Audiomeeter UIDs.
+public enum DedicatedDevice {
+    public static let vaio: Set<String> = ["Audiomeeter_UID", "Voicemeeter_UID"]
+    public static let aux: Set<String> = ["AudiomeeterAUX_UID", "VoicemeeterAUX_UID"]
+    public static let b1: Set<String> = ["AudiomeeterB1_UID", "VoicemeeterB1_UID"]
+    public static let b2: Set<String> = ["AudiomeeterB2_UID", "VoicemeeterB2_UID"]
+    public static var returns: Set<String> { b1.union(b2) }
+    /// Display names of the same devices, used only to auto-assign on first launch.
+    static let vaioNames: Set<String> = ["Audiomeeter", "Audiomeeter VAIO", "Voicemeeter", "Voicemeeter VAIO"]
+    static let auxNames: Set<String> = ["Audiomeeter AUX", "Voicemeeter AUX"]
+    public static func returnBus(_ uid: String?) -> BusID? {
+        guard let uid else { return nil }
+        return b1.contains(uid) ? .B1 : b2.contains(uid) ? .B2 : nil
+    }
+}
+
 /// Reject audible feedback cycles between internal return buses.
 public enum InternalBusRouting {
     public static func source(_ uid: String?) -> BusID? {
-        switch uid { case "AudiomeeterB1_UID", "VoicemeeterB1_UID": return .B1; case "AudiomeeterB2_UID", "VoicemeeterB2_UID": return .B2; default: return nil }
+        DedicatedDevice.returnBus(uid)
     }
     public static func hasCycle(_ strips: [StripID: StripSettings]) -> Bool {
         func reaches(_ current: BusID, _ target: BusID, _ visited: Set<BusID>) -> Bool {
