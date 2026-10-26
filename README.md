@@ -30,9 +30,9 @@ Apple Silicon / macOS 14以降向けの、ルーティング自由度の高い�
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────────────┐
-│ AUDIOMEETER   Mac出力: [▾] [→VAIO]   ENGINE LIVE  48000 Hz  256 samples    Menu ▾ │
+│ AUDIOMEETER   Mac出力: [▾] [→VAIO]   ENGINE LIVE  48000 Hz  256 samples     Menu ▾ │
 ├───────────────────────────────────────────────────────────────────────────────────┤
-│ 録音・再生デッキ  REC / PLAY / PAUSE / STOP / LOOP   SRC / FMT   PLAY TO [A1..B2]  │
+│ 録音・再生デッキ  REC / PLAY / PAUSE / STOP / LOOP   SRC / FMT   PLAY TO [A1..B2]    │
 ├──────────┬──────────┬──────────┬──────────┬──────────┬────────────────────────────┤
 │ HARDWARE │ HARDWARE │ HARDWARE │   VAIO   │   AUX    │ MASTER SECTION             │
 │ INPUT 1  │ INPUT 2  │ INPUT 3  │ (PC音声)  │  (通話等) │  A1  A2  A3   B1  B2       │
