@@ -35,7 +35,7 @@ Apple Silicon / macOS 14以降向けの、ルーティング自由度の高い�
 │ 録音・再生デッキ  REC / PLAY / PAUSE / STOP / LOOP   SRC / FMT   PLAY TO [A1..B2]  │
 ├──────────┬──────────┬──────────┬──────────┬──────────┬────────────────────────────┤
 │ HARDWARE │ HARDWARE │ HARDWARE │   VAIO   │   AUX    │ MASTER SECTION             │
-│ INPUT 1  │ INPUT 2  │ INPUT 3  │ (PC音声) │ (通話等) │  A1  A2  A3   B1  B2       │
+│ INPUT 1  │ INPUT 2  │ INPUT 3  │ (PC音声)  │  (通話等) │  A1  A2  A3   B1  B2       │
 │ PAD      │ PAD      │ PAD      │ EQ 3band │ EQ 3band │  機器名 / Mac音量バー        │
 │ COMP/GATE│ COMP/GATE│ COMP/GATE│ KARAOKE  │ KARAOKE  │  MODE / Mute / INSERT      │
 │ INSERTS  │ INSERTS  │ INSERTS  │ APPS     │ APPS     │  EQ(6band) / LIMIT         │
